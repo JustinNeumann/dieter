@@ -1,0 +1,126 @@
+# Server-only release of this fork (JustinNeumann/dieter): the Linux daemon tarballs and the
+# prebuilt harness runtime archives for amd64 and arm64, published as a GitHub prerelease for a
+# tag like v0.6.429-antigravity.1. Upstream's release.yml also builds the apps and refuses to run
+# outside dbpprt/dieter (config/identity.json); this workflow builds exactly what the Home
+# Assistant add-on (JustinNeumann/dieter-addon) consumes, with the same ldflags as upstream's
+# `fastlane server` lane: the daemon pins the SHA-256 of its runtime archive and, because the
+# version is not upstream's, the download directory of this release (HarnessRuntimeBaseURL).
+# No secrets: GITHUB_TOKEN publishes the release, Cosign signs SHA256SUMS keyless (OIDC).
+name: Fork server release
+
+on:
+  push:
+    tags:
+      - "v*-antigravity.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and publish (vX.Y.Z-antigravity.N)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    name: linux-${{ matrix.arch }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: go node
+          harness: "true"
+      - name: Harness runtime archive, daemon and capture helper
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-antigravity\.[0-9]+$ ]] || { echo "::error::tag must look like v0.6.429-antigravity.1, got $TAG"; exit 1; }
+          [[ "$(go env GOHOSTARCH)" == "$ARCH" ]] || { echo "::error::runner is $(go env GOHOSTARCH), matrix wants $ARCH"; exit 1; }
+          mkdir -p dist
+          runtime="dist/dieter-harness-runtime-linux-${ARCH}.tar.gz"
+          go run ./cmd/dieter __harness-runtime-archive --output "$runtime"
+          sum=$(sha256sum "$runtime" | cut -d' ' -f1)
+          pkg="$(sed -n 's/^module //p' go.mod)/internal/platform/buildinfo"
+          built=$(git show -s --format=%cI HEAD)
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          stage="dist/dieter-linux-${ARCH}"
+          mkdir -p "$stage"
+          CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath \
+            -ldflags "-s -w -X ${pkg}.ReleaseVersion=${version} -X ${pkg}.SourceRevision=${GITHUB_SHA} -X ${pkg}.BuiltAt=${built} -X ${pkg}.HarnessRuntimeSHA256=${sum} -X ${pkg}.HarnessRuntimeBaseURL=${base}" \
+            -o "$stage/dieter" ./cmd/dieter
+          "$stage/dieter" --version | grep -F "$version"
+          cp LICENSE deploy/install/install.sh "$stage/"
+          echo "$version" > "$stage/VERSION"
+          GOARCH="$ARCH" native/linux-capture/build-release.sh "$stage/dieter-capture"
+          tar -C dist -czf "dist/dieter-linux-${ARCH}.tar.gz" "dieter-linux-${ARCH}"
+          rm -rf "$stage"
+          ls -l dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fork-server-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  publish:
+    name: Publish prerelease ${{ inputs.tag || github.ref_name }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # the GitHub release
+      id-token: write # Cosign keyless signing
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: cosign
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: fork-server-*
+          path: dist/release
+          merge-multiple: true
+      - name: SHA256SUMS and its signature
+        run: |
+          set -euo pipefail
+          cd dist/release
+          sha256sum -- * > SHA256SUMS
+          cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+          cat SHA256SUMS
+      - name: GitHub prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Server-only build of this fork for the Home Assistant add-on: upstream Dieter ${TAG%%-antigravity.*} plus the Antigravity harness (branch antigravity-pr)."
+            echo
+            echo "Verify: \`cosign verify-blob --bundle SHA256SUMS.sigstore.json --certificate-identity https://github.com/${GITHUB_REPOSITORY}/.github/workflows/fork-server-release.yml@refs/tags/${TAG} --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS\`"
+            echo
+            echo '```'
+            cat dist/release/SHA256SUMS
+            echo '```'
+          } > notes.md
+          gh release create "$TAG" --prerelease --verify-tag --title "$TAG (fork server build)" --notes-file notes.md dist/release/*
