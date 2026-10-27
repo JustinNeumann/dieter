@@ -6,6 +6,12 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
+## Fork: server release v0.6.429-antigravity.3 (2026-10-28)
+
+- The fork build reports its version as `0.6.429+antigravity.N` (build metadata) instead of the pre-release
+  `0.6.429-antigravity.N`, which a gateway with minimum 0.6.429 refused as too old. Tags and release URLs are
+  unchanged (`v0.6.429-antigravity.N`).
+
 ## Unreleased
 
 ### Added

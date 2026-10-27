@@ -52,8 +52,13 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          version="${TAG#v}"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-antigravity\.[0-9]+$ ]] || { echo "::error::tag must look like v0.6.429-antigravity.1, got $TAG"; exit 1; }
+          tagversion="${TAG#v}"
+          [[ "$tagversion" =~ ^[0-9]+\.[0-9]+\.[0-9]+-antigravity\.[0-9]+$ ]] || { echo "::error::tag must look like v0.6.429-antigravity.1, got $TAG"; exit 1; }
+          # The binary reports the fork suffix as build metadata (0.6.429+antigravity.3), not as a pre-release
+          # (0.6.429-antigravity.3): Semantic Versioning ranks a pre-release below its release, so a gateway with
+          # minimum 0.6.429 refused earlier fork builds ("Dieter client update required by gateway").
+          # Build metadata is ignored in precedence, so the daemon counts as 0.6.429. Tags and URLs keep the dash.
+          version="${tagversion%%-antigravity.*}+antigravity.${tagversion##*-antigravity.}"
           [[ "$(go env GOHOSTARCH)" == "$ARCH" ]] || { echo "::error::runner is $(go env GOHOSTARCH), matrix wants $ARCH"; exit 1; }
           mkdir -p dist
           runtime="dist/dieter-harness-runtime-linux-${ARCH}.tar.gz"
