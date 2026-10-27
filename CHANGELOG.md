@@ -18,6 +18,12 @@ copy the **Unreleased** notes into a section named after that exact version
   conversation. Host-defined tools, suspend/continue and compaction are not
   available through the CLI. `agy` must be installed and signed in on the
   execution machine.
+- Questions from the agent (Claude Code's AskUserQuestion) no longer hang a
+  turn. The harness worker relays the question to the host named by
+  `DIETER_QUESTIONS_URL` (list it in `DIETER_HARNESS_ENV` so the daemon
+  forwards it to its workers; the Home Assistant add-on shows it on its page),
+  waits for the answer and continues the turn with it; without such a host
+  the question is declined at once so the agent asks in plain text instead.
 
 ## 0.6.430
 
