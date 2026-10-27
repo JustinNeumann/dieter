@@ -11,6 +11,7 @@ import {
 } from "./capabilities.mjs";
 import { promptWithLocalAttachments } from "./local-attachments.mjs";
 import { createClaudeDiagnosticTracker } from "./claude-resilience.mjs";
+import { QUESTIONS_TOOL, createQuestionRelay, questionToolResult } from "./host-questions.mjs";
 
 // Only Node built-ins and the light local modules above load before the mock
 // fast path. The harness SDKs below are imported once a real turn needs them:
@@ -124,6 +125,13 @@ const adapter = request.adapter || request.harness;
 if (typeof request.sessionId !== "string" || !/^[A-Za-z0-9._-]+$/.test(request.sessionId)) {
   throw new Error("invalid harness session ID");
 }
+// Questions the agent asks the user pause the turn until the host answers (host-questions.mjs).
+const questionRelay = createQuestionRelay({
+  url: process.env.DIETER_QUESTIONS_URL,
+  sessionId: request.sessionId,
+  log: (text) => console.error(text),
+});
+const pendingQuestions = new Map();
 const sandboxWorkDir = `workspaces/${request.sessionId}/repo`;
 const sandbox = await createLocalSandboxProvider({
   root: request.runtimeRoot,
@@ -631,8 +639,36 @@ try {
         if (claudeDelegationSeen && chunk.type === "text-delta" && String(chunk.delta || "").trim())
           claudeFinalTextSeen = true;
       }
+      if (chunk.toolName === QUESTIONS_TOOL && chunk.toolCallId) {
+        if (chunk.type === "tool-input-available")
+          pendingQuestions.set(chunk.toolCallId, chunk.input);
+        else if (chunk.type === "tool-output-available" || chunk.type === "tool-output-error")
+          pendingQuestions.delete(chunk.toolCallId);
+      }
       capabilityCollector.consumeUIChunk(chunk);
       send({ type: "chunk", chunk });
+    }
+  }
+  // The harness ends its stream when the agent waits for the user's answer to a question; the
+  // turn stays unfinished. Collect the answers and continue the same turn with the tool results.
+  async function answerQuestions(summary, diagnosticTurn) {
+    while (pendingQuestions.size && !controller.signal.aborted && session?.hasUnfinishedTurn?.()) {
+      const continuations = [];
+      for (const [toolCallId, input] of [...pendingQuestions]) {
+        const output = await questionRelay.ask(toolCallId, input);
+        pendingQuestions.delete(toolCallId);
+        continuations.push(questionToolResult(toolCallId, output));
+      }
+      if (controller.signal.aborted) return;
+      await streamResult(
+        await agent.continueStream({
+          session,
+          toolResultContinuations: continuations,
+          abortSignal: controller.signal,
+        }),
+        summary,
+        diagnosticTurn,
+      );
     }
   }
   async function runStream(start) {
@@ -641,6 +677,7 @@ try {
     let streamError;
     try {
       await streamResult(await start(), summary, diagnosticTurn);
+      await answerQuestions(summary, diagnosticTurn);
     } catch (error) {
       streamError = error;
     }
