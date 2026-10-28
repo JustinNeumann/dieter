@@ -306,7 +306,7 @@ func (s *Store) attachCheckout(projectID, path, name string, validation []model.
 	checkout := model.Checkout{ID: home.NewID("co_"), ProjectID: projectID, DaemonID: identity.DaemonID, Name: name, Path: path, ValidationCommands: validation}
 	return checkout, s.publishCheckout(checkout)
 }
-func (s *Store) publishCheckout(checkout model.Checkout) error {
+func (s *Store) publishCheckout(checkout model.Checkout, effects ...replica.Effect) error {
 	identity, err := s.replica.WriterIdentity()
 	if err != nil {
 		return err
@@ -329,7 +329,70 @@ func (s *Store) publishCheckout(checkout model.Checkout) error {
 	if err = replica.ApplyFields(&data, identity, "checkout", checkout.ID, nil, checkoutFields(checkout)); err != nil {
 		return err
 	}
-	return s.replica.WritePeerState(identity.Account, data, replica.Effect{Path: "checkouts/" + checkout.ID + ".json", Value: replica.RawValue(checkout)})
+	effects = append([]replica.Effect{{Path: "checkouts/" + checkout.ID + ".json", Value: replica.RawValue(checkout)}}, effects...)
+	return s.replica.WritePeerState(identity.Account, data, effects...)
+}
+
+// RehomeCheckouts re-registers this machine's working trees after it enrolled
+// under a new daemon ID (`dieter daemon unenroll`, then a new enrollment with
+// the same account). The shared registrations of the previous ID are immutable
+// and belong to a machine that no longer exists, so each working tree whose
+// local checkout file still names that ID gets a fresh registration owned by
+// this daemon, and the stale local file is dropped so the old registration no
+// longer offers a path here. Conversations and schedules of the previous ID
+// stay with it; they are history on this machine. Idempotent: a second run
+// finds nothing to re-home.
+func (s *Store) RehomeCheckouts() ([]model.Checkout, error) {
+	release, err := s.home.BeginWrite()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	identity, err := s.replica.WriterIdentity()
+	if err != nil {
+		return nil, err
+	}
+	if identity.Account == "local" {
+		return nil, nil
+	}
+	values, err := s.ListCheckouts("")
+	if err != nil {
+		return nil, err
+	}
+	owned := map[string]bool{}
+	for _, c := range values {
+		if c.DaemonID == identity.DaemonID && c.Path != "" {
+			owned[c.ProjectID+"\x00"+c.Path] = true
+		}
+	}
+	result := []model.Checkout{}
+	for _, c := range values {
+		// A local checkout file is written only by this machine, as the daemon
+		// it was at the time. One that names another daemon is a registration
+		// from before this machine enrolled again.
+		if c.DaemonID == identity.DaemonID || c.Path == "" {
+			continue
+		}
+		stale := replica.Effect{Path: "checkouts/" + c.ID + ".json", Remove: true}
+		key := c.ProjectID + "\x00" + c.Path
+		if owned[key] {
+			data, err := s.replica.OpenPeerView(identity.Account)
+			if err != nil {
+				return result, err
+			}
+			if err := s.replica.WritePeerState(identity.Account, data, stale); err != nil {
+				return result, err
+			}
+			continue
+		}
+		next := model.Checkout{ID: home.NewID("co_"), ProjectID: c.ProjectID, DaemonID: identity.DaemonID, Name: c.Name, Path: c.Path, ValidationCommands: c.ValidationCommands}
+		if err := s.publishCheckout(next, stale); err != nil {
+			return result, err
+		}
+		owned[key] = true
+		result = append(result, next)
+	}
+	return result, nil
 }
 func (s *Store) DetachCheckout(id string) error {
 	release, err := s.home.BeginWrite()

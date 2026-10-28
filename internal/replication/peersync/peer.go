@@ -269,6 +269,7 @@ type PeerSync struct {
 	rtcMu       sync.Mutex
 	rtcRetry    map[string]peerRTCRetry
 	now         func() time.Time
+	rehomed     atomic.Bool // a round re-homed this machine's checkouts, or found nothing to
 }
 
 func (p *PeerSync) rtcAttemptAllowed(target string) bool {
@@ -409,6 +410,34 @@ func (p *PeerSync) Run(ctx context.Context) {
 }
 func (p *PeerSync) Round(ctx context.Context) error { return p.round(ctx, ctx, nil) }
 
+// rehome re-registers this machine's checkouts once its peer store binds a
+// new daemon ID of the same account (the machine enrolled again after
+// `dieter daemon unenroll`). The first round of a process also checks, in
+// case the daemon stopped between the rebinding and the re-homing.
+func (p *PeerSync) rehome(previous, binding replica.PeerIdentity) error {
+	changed := previous.Account == binding.Account && previous.DaemonID != "" && previous.DaemonID != binding.DaemonID
+	if !changed && p.rehomed.Load() {
+		return nil
+	}
+	checkouts, err := p.Store.Kanban.RehomeCheckouts()
+	if err != nil {
+		return fmt.Errorf("re-home checkouts after enrollment change: %w", err)
+	}
+	p.rehomed.Store(true)
+	if len(checkouts) > 0 {
+		logger := p.Log
+		if logger == nil {
+			logger = slog.Default()
+		}
+		names := make([]string, 0, len(checkouts))
+		for _, c := range checkouts {
+			names = append(names, c.Name+" ("+c.Path+")")
+		}
+		logger.Info("re-registered this machine's checkouts under its new daemon ID; conversations of the previous ID stay read-only", "previous", previous.DaemonID, "daemon", binding.DaemonID, "checkouts", strings.Join(names, ", "))
+	}
+	return nil
+}
+
 // Discovery can fail globally; exchange failures back off only their target.
 // Serve dispatches without waiting for slow exchanges. Explicit Round waits for
 // its admitted peers, preserving callers' durable convergence boundary.
@@ -444,8 +473,12 @@ func (p *PeerSync) round(ctx, workerCtx context.Context, workers *sync.WaitGroup
 	}
 	subject := fmt.Sprintf("github:%d", account.GetGithubId())
 	scope := crdt.Revision([]string{p.Identity.Issuer(), subject})
+	previous, _ := p.Store.Replica.PeerIdentity()
 	binding, err := p.Store.Replica.BindPeerAccount(scope, subject, p.Identity.ID, p.Identity.Issuer())
 	if err != nil {
+		return err
+	}
+	if err := p.rehome(previous, binding); err != nil {
 		return err
 	}
 	discovery, cancel = context.WithTimeout(ctx, 10*time.Second)

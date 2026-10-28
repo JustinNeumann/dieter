@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dbpprt/dieter/internal/platform/fault"
 	"github.com/dbpprt/dieter/internal/replication/crdt"
 	"github.com/dbpprt/dieter/internal/store/home"
 )
@@ -37,7 +38,7 @@ func (s *Store) EnsureIdentity() (PeerIdentity, error) {
 func (s *Store) WriterIdentity() (PeerIdentity, error) {
 	identity, err := s.PeerIdentity()
 	if err == nil {
-		return identity, nil
+		return identity, s.checkEnrollmentBinding(identity)
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		return identity, err
@@ -61,4 +62,25 @@ func (s *Store) Snapshot() (PeerIdentity, PeerData, error) {
 	}
 	data, err := s.OpenPeerSnapshot(identity.Account)
 	return identity, data, err
+}
+
+// checkEnrollmentBinding refuses to publish as a peer identity that this
+// machine no longer holds. After `dieter daemon unenroll` and a new enrollment
+// the daemon credential (daemon/identity.json) names a new daemon ID while
+// peers/identity.json still binds the old one until the next peer sync round
+// calls BindPeerAccount. Records written in between would be owned by the old
+// ID without a key that can sign them, so no peer would accept them and this
+// machine could never continue them either.
+func (s *Store) checkEnrollmentBinding(identity PeerIdentity) error {
+	if identity.Account == "local" {
+		return nil
+	}
+	credential, err := s.peerCredential()
+	if err != nil {
+		return err
+	}
+	if credential.ID != "" && credential.ID != identity.DaemonID {
+		return fault.New(fault.FailedPrecondition, "this machine enrolled again as "+credential.ID+" but its peer store still binds "+identity.DaemonID+"; writes resume after the next peer sync round")
+	}
+	return nil
 }

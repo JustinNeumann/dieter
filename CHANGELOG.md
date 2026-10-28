@@ -6,6 +6,20 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
+## Fork: server release v0.6.429-antigravity.4 (unreleased)
+
+- A machine that enrolls again under the same account (`dieter daemon unenroll`, then a new enrollment; the
+  Home Assistant add-on's **Re-enroll**) keeps its working trees usable: at the first peer sync round that
+  binds the new daemon ID, the daemon registers each checkout whose local file still names the previous ID
+  again under the new ID and drops the stale file, so `card create` and the apps find a checkout on the
+  machine. Before, every checkout stayed with the previous ID ("project has no checkout on the target
+  machine", NotFound from the apps) and had to be re-attached by hand. Conversations and schedules of the
+  previous ID stay with it and are read-only history: peers reject any change of a shared owner identity,
+  so they cannot move (`daemon unenroll --help` says so now).
+- Between a new enrollment and that first peer sync round the store refuses writes instead of publishing
+  them as the previous daemon ID. Such records had no key that could sign them, every peer rejected the
+  page that carried them and that peer's sync stalled on it for good.
+
 ## Fork: server release v0.6.429-antigravity.3 (2026-10-28)
 
 - The fork build reports its version as `0.6.429+antigravity.N` (build metadata) instead of the pre-release

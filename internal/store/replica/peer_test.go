@@ -3,11 +3,14 @@ package replica_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/dbpprt/dieter/internal/replication/crdt"
 	"github.com/dbpprt/dieter/internal/store"
+	"github.com/dbpprt/dieter/internal/store/kanban"
+	"github.com/dbpprt/dieter/internal/testkit"
 )
 
 func TestPeerPersistenceAtomicConflictAndAccountIsolation(t *testing.T) {
@@ -120,5 +123,44 @@ func TestPeerProgressDoesNotRewriteReplica(t *testing.T) {
 	data, err := s.Replica.PeerData("a")
 	if err != nil || data.LastRoute != "webrtc-turn" || len(data.Records) != 1 {
 		t.Fatal(data, err)
+	}
+}
+
+func TestWriterIdentityWaitsForRebindAfterReenrollment(t *testing.T) {
+	t.Parallel()
+	s := store.New(t.TempDir())
+	if _, err := s.Replica.BindPeerAccount("account", "github:1", "daemon-a", "https://gateway.test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Replica.WriterIdentity(); err != nil {
+		t.Fatal(err)
+	}
+	// The daemon enrolled again (daemon/identity.json names the new ID) and
+	// its peer store has not rebound yet.
+	if err := os.MkdirAll(filepath.Join(s.Root, "daemon"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(s.Root, "daemon", "identity.json"), []byte(`{"id":"daemon-b"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Replica.WriterIdentity(); err == nil || !strings.Contains(err.Error(), "daemon-b") {
+		t.Fatalf("writer identity of a re-enrolled daemon before rebinding: %v", err)
+	}
+	if _, err := s.Kanban.CreateProject(kanban.CreateProjectInput{Name: "Repo", Path: testkit.ProjectDir(t)}); err == nil {
+		t.Fatal("a project was registered under the old daemon ID")
+	}
+	if _, err := s.Replica.BindPeerAccount("account", "github:1", "daemon-b", "https://gateway.test"); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := s.Replica.WriterIdentity()
+	if err != nil || identity.DaemonID != "daemon-b" {
+		t.Fatalf("writer identity after rebinding: %+v %v", identity, err)
+	}
+	// An unenrolled store (no daemon credential) keeps writing as before.
+	if err := os.Remove(filepath.Join(s.Root, "daemon", "identity.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Replica.WriterIdentity(); err != nil {
+		t.Fatal(err)
 	}
 }
