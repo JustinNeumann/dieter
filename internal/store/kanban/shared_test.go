@@ -426,3 +426,77 @@ func TestReplicaArchivesRemainExplicitWithOwnerOffline(t *testing.T) {
 		t.Fatalf("project archive: %+v %v", state, err)
 	}
 }
+
+func TestReenrolledMachineRehomesItsCheckouts(t *testing.T) {
+	t.Parallel()
+	a, b := testkit.PeerStore(t, "machine_a"), testkit.PeerStore(t, "machine_b")
+	path := testkit.ProjectDir(t)
+	project, err := a.Kanban.CreateProject(kanban.CreateProjectInput{Name: "Repo", Path: path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	board, err := a.Kanban.CreateBoard(kanban.CreateBoardInput{Project: project.ID, Name: "Main"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := project.Checkouts[0]
+	if _, err = a.Kanban.CreateCard(kanban.CreateCardInput{Project: project.ID, Board: board.ID, Title: "Before", WorkspaceMode: model.WorkspaceModeProject}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.JoinPeers(t, a, b)
+	// `dieter daemon unenroll` and a new enrollment with the same account bind
+	// the same store to a new daemon ID.
+	if _, err = a.Replica.BindPeerAccount("account", "subject", "machine_a2", "https://gateway.test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.Kanban.CreateCard(kanban.CreateCardInput{Project: project.ID, Board: board.ID, Title: "Orphan", WorkspaceMode: model.WorkspaceModeProject}); err == nil {
+		t.Fatal("the old registration still served as this machine's checkout")
+	}
+	rehomed, err := a.Kanban.RehomeCheckouts()
+	if err != nil || len(rehomed) != 1 || rehomed[0].DaemonID != "machine_a2" || rehomed[0].Path != path || rehomed[0].ProjectID != project.ID || rehomed[0].ID == old.ID {
+		t.Fatalf("rehome: %+v %v", rehomed, err)
+	}
+	checkouts, err := a.Kanban.ListCheckouts(project.ID)
+	if err != nil || len(checkouts) != 2 {
+		t.Fatalf("checkouts: %+v %v", checkouts, err)
+	}
+	for _, c := range checkouts {
+		if (c.ID == old.ID) != (c.Path == "") {
+			t.Fatalf("the stale registration still offers a path, or the new one lacks it: %+v", c)
+		}
+	}
+	local, err := a.Kanban.LocalCheckout(project.ID, "")
+	if err != nil || local.ID != rehomed[0].ID {
+		t.Fatalf("local checkout: %+v %v", local, err)
+	}
+	card, err := a.Kanban.CreateCard(kanban.CreateCardInput{Project: project.ID, Board: board.ID, Title: "After", WorkspaceMode: model.WorkspaceModeProject})
+	if err != nil || card.OwnerDaemonID != "machine_a2" || card.CheckoutID != rehomed[0].ID {
+		t.Fatalf("card after re-enrollment: %+v %v", card, err)
+	}
+	// Peers accept the new registration: nothing immutable changed.
+	testkit.JoinPeers(t, a, b)
+	remote, err := b.Kanban.ListCheckouts(project.ID)
+	if err != nil || len(remote) != 2 {
+		t.Fatalf("peer checkouts: %+v %v", remote, err)
+	}
+	again, err := a.Kanban.RehomeCheckouts()
+	if err != nil || len(again) != 0 {
+		t.Fatalf("second run re-homed again: %+v %v", again, err)
+	}
+	// A path the new identity already registered itself only loses its stale file.
+	other := testkit.ProjectDir(t)
+	if _, err = a.Replica.BindPeerAccount("account", "subject", "machine_a3", "https://gateway.test"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = a.Kanban.AttachCheckout(project.ID, other, "Other"); err != nil {
+		t.Fatal(err)
+	}
+	rehomed, err = a.Kanban.RehomeCheckouts()
+	if err != nil || len(rehomed) != 1 || rehomed[0].Path != path {
+		t.Fatalf("third identity: %+v %v", rehomed, err)
+	}
+	owned, err := a.Kanban.OwnedCheckouts()
+	if err != nil || len(owned) != 2 {
+		t.Fatalf("owned after third identity: %+v %v", owned, err)
+	}
+}

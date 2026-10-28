@@ -465,8 +465,13 @@ func (c *CLI) daemonUnenroll(args []string) error {
 
 Revoke this machine at its Dieter gateway, remove it from the account's
 trusted devices, and delete its enrollment key and credential. A later
-enrollment creates a new key that a trusted device approves again. Projects,
-conversations, schedules, and harness settings remain.
+enrollment creates a new key that a trusted device approves again, under a
+new daemon ID. Projects and harness settings remain. The machine's checkouts
+are registered again under the new ID at its first peer sync; conversations
+and schedules of the old ID keep their owner and become read-only history
+(their owner no longer exists, and shared ownership is immutable). To keep
+them, do not unenroll: a machine revoked only at the gateway restores its ID
+with ` + "`dieter daemon recover`" + `.
 `
 	set := flags("daemon unenroll")
 	help, err := parse(set, args, usage, c.Out)
