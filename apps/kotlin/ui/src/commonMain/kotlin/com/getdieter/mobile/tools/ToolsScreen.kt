@@ -11,9 +11,11 @@ import androidx.compose.material3.*
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.screens.*
 import com.getdieter.mobile.settings.DevicesScreen
@@ -100,8 +102,19 @@ internal fun ToolsScreen(store: MobileStore) {
     val workspace by store.workspace.slice.collectAsState()
     val quotas by store.machines.quotas.collectAsState()
     val selectedProject by store.boards.selectedProject.collectAsState()
+    val extensions = LocalMobileExtensions.current
     val project = workspace.projects.firstOrNull { it.id == store.boards.currentProjectId() }
     val online = session.machines.count { it.online }
+    val lowest =
+        quotas.group_rows.filter { it.lowest_remaining >= 0 }.minOfOrNull { it.lowest_remaining }
+    fun open(page: ToolPage) {
+        val scoped = page == ToolPage.FILES || page == ToolPage.CHANGES || page == ToolPage.SCHEDULES
+        store.showFrom(
+            MobileRoute.Root(MobileTab.TOOLS),
+            if (scoped) MobileRoute.Tool(page, selectedProject.ifEmpty { project?.id.orEmpty() })
+            else MobileRoute.Tool(page),
+        )
+    }
     Screen(ScreenChrome("Tools", large = true)) {
         LazyColumn(
             Modifier.fillMaxSize().testTag("tools-list"),
@@ -110,93 +123,74 @@ internal fun ToolsScreen(store: MobileStore) {
         ) {
             titleHeader()
             item { ConnectionNotice(store) }
-            item { SectionHeader("Machines") }
-            item {
-                Group(listOf(ToolPage.MACHINES, ToolPage.TERMINALS, ToolPage.SCREENS)) {
-                    page,
-                    position ->
-                    ListRow(
-                        page.title,
-                        Modifier.testTag("tool-${page.name.lowercase()}"),
-                        position = position,
-                        glyph = page.glyph,
-                        tile = page.color,
-                        value =
-                            when (page) {
-                                ToolPage.MACHINES ->
-                                    if (session.machines.isEmpty()) ""
-                                    else "$online of ${session.machines.size} online"
-                                else -> null
-                            },
-                        accessory = Accessory.CHEVRON,
-                        onClick = {
-                            store.showFrom(
-                                MobileRoute.Root(MobileTab.TOOLS),
-                                MobileRoute.Tool(page),
+            for (section in ToolSection.entries) {
+                val builtIn =
+                    when (section) {
+                        ToolSection.MACHINES ->
+                            listOf(ToolPage.MACHINES, ToolPage.TERMINALS, ToolPage.SCREENS)
+                        ToolSection.WORKSPACE ->
+                            listOf(ToolPage.FILES, ToolPage.CHANGES, ToolPage.SCHEDULES)
+                        ToolSection.ACCOUNT ->
+                            listOf(ToolPage.USAGE, ToolPage.DEVICES, ToolPage.SETTINGS)
+                    }
+                val rows: List<Any> = builtIn + extensions.pages.filter { it.section == section }
+                item("header-${section.name}") {
+                    when (section) {
+                        ToolSection.MACHINES -> SectionHeader("Machines")
+                        ToolSection.WORKSPACE ->
+                            SectionHeader(
+                                "Workspace",
+                                trailing = {
+                                    if (project != null)
+                                        Text(
+                                            project.name,
+                                            style = type.footnote,
+                                            color = palette.secondaryLabel,
+                                        )
+                                },
                             )
-                        },
-                    )
+                        ToolSection.ACCOUNT -> SectionHeader("Account")
+                    }
                 }
-            }
-            item {
-                SectionHeader(
-                    "Workspace",
-                    trailing = {
-                        if (project != null)
-                            Text(
-                                project.name,
-                                style = type.footnote,
-                                color = palette.secondaryLabel,
-                            )
-                    },
-                )
-            }
-            item {
-                Group(listOf(ToolPage.FILES, ToolPage.CHANGES, ToolPage.SCHEDULES)) { page, position
-                    ->
-                    ListRow(
-                        page.title,
-                        Modifier.testTag("tool-${page.name.lowercase()}"),
-                        position = position,
-                        glyph = page.glyph,
-                        tile = page.color,
-                        accessory = Accessory.CHEVRON,
-                        onClick = {
-                            store.showFrom(
-                                MobileRoute.Root(MobileTab.TOOLS),
-                                MobileRoute.Tool(
-                                    page,
-                                    selectedProject.ifEmpty { project?.id.orEmpty() },
-                                ),
-                            )
-                        },
-                    )
-                }
-            }
-            item { SectionHeader("Account") }
-            item {
-                Group(listOf(ToolPage.USAGE, ToolPage.DEVICES, ToolPage.SETTINGS)) { page, position
-                    ->
-                    val lowest =
-                        quotas.group_rows
-                            .filter { it.lowest_remaining >= 0 }
-                            .minOfOrNull { it.lowest_remaining }
-                    ListRow(
-                        page.title,
-                        Modifier.testTag("tool-${page.name.lowercase()}"),
-                        position = position,
-                        glyph = page.glyph,
-                        tile = page.color,
-                        value =
-                            if (page == ToolPage.USAGE && lowest != null) "$lowest% left" else null,
-                        accessory = Accessory.CHEVRON,
-                        onClick = {
-                            store.showFrom(
-                                MobileRoute.Root(MobileTab.TOOLS),
-                                MobileRoute.Tool(page),
-                            )
-                        },
-                    )
+                item("group-${section.name}") {
+                    Group(rows) { row, position ->
+                        when (row) {
+                            is ToolPage ->
+                                ListRow(
+                                    row.title,
+                                    Modifier.testTag("tool-${row.name.lowercase()}"),
+                                    position = position,
+                                    glyph = row.glyph,
+                                    tile = row.color,
+                                    value =
+                                        when (row) {
+                                            ToolPage.MACHINES ->
+                                                if (session.machines.isEmpty()) ""
+                                                else "$online of ${session.machines.size} online"
+                                            ToolPage.USAGE -> lowest?.let { "$it% left" }
+                                            else -> null
+                                        },
+                                    accessory = Accessory.CHEVRON,
+                                    onClick = { open(row) },
+                                )
+                            is ExtensionPage ->
+                                ListRow(
+                                    row.title,
+                                    Modifier.testTag("tool-${row.id}"),
+                                    position = position,
+                                    glyph = row.glyph,
+                                    tile = Color(row.tint),
+                                    value = row.value(store),
+                                    accessory = Accessory.CHEVRON,
+                                    onClick = {
+                                        store.showFrom(
+                                            MobileRoute.Root(MobileTab.TOOLS),
+                                            MobileRoute.Extension(row.id),
+                                        )
+                                    },
+                                )
+                        }
+                    }
                 }
             }
         }

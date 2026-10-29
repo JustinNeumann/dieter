@@ -15,11 +15,14 @@ import androidx.compose.ui.unit.dp
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
+import com.getdieter.mobile.navigation.ToolPage
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.store.*
 
 @Composable
 internal fun UsageScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val view by store.machines.quotas.collectAsState()
     var reset by remember { mutableStateOf<QuotaAccountRow?>(null) }
     Screen(
@@ -216,6 +219,7 @@ internal fun UsageScreen(store: MobileStore) {
                         Modifier.padding(top = 40.dp),
                     )
                 }
+            extensionSections(extensions.toolSections[ToolPage.USAGE], store)
         }
     }
     reset?.let { account ->

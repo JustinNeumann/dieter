@@ -20,11 +20,14 @@ import androidx.compose.ui.unit.dp
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
+import com.getdieter.mobile.navigation.ToolPage
 import com.getdieter.mobile.platform.*
 import com.getdieter.mobile.store.*
 
 @Composable
 internal fun SettingsScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val session by store.session.slice.collectAsState()
     val selectedPalette by store.theme.palette.collectAsState()
     val appearance by store.theme.appearance.collectAsState()
@@ -301,6 +304,7 @@ internal fun SettingsScreen(store: MobileStore) {
                     "Signing out clears this device’s cached workspace, unsent work and drafts."
                 )
             }
+            extensionSections(extensions.toolSections[ToolPage.SETTINGS], store)
         }
     }
     if (addGateway || gatewayEditor != null)

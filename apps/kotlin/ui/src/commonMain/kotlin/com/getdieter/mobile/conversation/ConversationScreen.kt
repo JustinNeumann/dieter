@@ -41,6 +41,7 @@ import com.getdieter.mobile.board.*
 import com.getdieter.mobile.creation.*
 import com.getdieter.core.presentation.Markdown
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.platform.*
@@ -450,6 +451,9 @@ private fun Transcript(
                 Spinner(Modifier.size(14.dp))
                 Text("Refreshing…", style = type.caption, color = palette.secondaryLabel)
             }
+        }
+        LocalMobileExtensions.current.conversationWidgets.forEach { widget ->
+            key(widget.key) { widget.content(store, selected) }
         }
         Composer(
             store,

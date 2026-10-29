@@ -23,6 +23,7 @@ import com.getdieter.mobile.channels.*
 import com.getdieter.mobile.conversation.*
 import com.getdieter.mobile.creation.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.mail.*
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.platform.*
@@ -313,7 +314,12 @@ internal fun RouteContent(store: MobileStore, route: MobileRoute, openUrl: (Stri
                 MobileTab.TOOLS -> ToolsScreen(store)
             }
         is MobileRoute.Project -> ProjectScreen(store, route.projectId)
-        is MobileRoute.Board -> BoardScreen(store, route.boardId)
+        is MobileRoute.Board -> {
+            val renderer = LocalMobileExtensions.current.boardRenderer
+            if (renderer != null && renderer.claims(store, route.boardId))
+                renderer.content(store, route.boardId)
+            else BoardScreen(store, route.boardId)
+        }
         is MobileRoute.Conversation -> ConversationScreen(store, card(route.cardId), openUrl)
         is MobileRoute.Channel -> ChannelScreen(store, route.projectId, openUrl)
         is MobileRoute.MailMessage -> MailMessageScreen(store, route, openUrl)
@@ -327,6 +333,14 @@ internal fun RouteContent(store: MobileStore, route: MobileRoute, openUrl: (Stri
         is MobileRoute.TerminalSession ->
             TerminalSessionScreen(store, route.terminalId, card(route.cardId))
         is MobileRoute.ScreenSession -> NativeScreen(store, route.machineId)
+        is MobileRoute.Extension -> {
+            val page = LocalMobileExtensions.current.page(route.id)
+            if (page != null) page.content(store, route.arg)
+            else
+                Screen(ScreenChrome("Not available")) {
+                    EmptyState(Glyph.WARNING, "Not available", "This page is not part of this app.")
+                }
+        }
     }
 }
 

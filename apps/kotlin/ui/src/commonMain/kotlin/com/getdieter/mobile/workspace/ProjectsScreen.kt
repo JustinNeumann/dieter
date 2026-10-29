@@ -22,11 +22,13 @@ import com.getdieter.mobile.admin.*
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.creation.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.store.*
 
 @Composable
 internal fun ProjectsScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val workspace by store.workspace.slice.collectAsState()
     val navigation by store.workspace.navigation.collectAsState()
     val session by store.session.slice.collectAsState()
@@ -71,7 +73,21 @@ internal fun ProjectsScreen(store: MobileStore) {
                                         },
                                     )
                                 )
-                            ),
+                            ) +
+                                extensions.projectActions
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let { actions ->
+                                        listOf(
+                                            MenuSection(
+                                                actions.map { action ->
+                                                    ChromeAction(action.id, action.title, action.glyph) {
+                                                        action.onClick(store)
+                                                    }
+                                                }
+                                            )
+                                        )
+                                    }
+                                    .orEmpty(),
                     )
                 ),
             primary = newTaskAction(store),

@@ -168,6 +168,11 @@ sealed class MobileRoute {
         override val immersive = true
     }
 
+    /** A page a host app adds (see [com.getdieter.mobile.extensions.MobileExtensions]). */
+    data class Extension(val id: String, val arg: String = "") : MobileRoute() {
+        override val key = "ext/$id/$arg"
+    }
+
     data class ScreenSession(val machineId: String) : MobileRoute() {
         override val key = "screen/$machineId"
         override val immersive = true

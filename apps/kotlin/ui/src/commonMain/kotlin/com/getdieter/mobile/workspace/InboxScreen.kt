@@ -39,6 +39,7 @@ import com.getdieter.mobile.app.*
 import com.getdieter.mobile.board.*
 import com.getdieter.mobile.creation.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.store.*
 import kotlin.time.Instant
@@ -52,6 +53,7 @@ private enum class InboxFilter(val title: String) {
 
 @Composable
 internal fun InboxScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val view by store.workspace.activity.collectAsState()
     val workspace by store.workspace.slice.collectAsState()
     val refreshing by store.session.refreshing.collectAsState()
@@ -181,6 +183,9 @@ internal fun InboxScreen(store: MobileStore) {
                             )
                         }
                     }
+                }
+                extensions.inboxSections.forEach { section ->
+                    item("ext-${section.key}") { section.content(store) }
                 }
                 val hidden = view.summary?.hidden ?: 0
                 if (hidden > 0)

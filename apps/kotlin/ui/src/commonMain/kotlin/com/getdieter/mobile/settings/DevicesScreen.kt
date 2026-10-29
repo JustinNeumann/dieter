@@ -30,6 +30,8 @@ import com.getdieter.client.v1.*
 import com.getdieter.core.client.rules.DeviceExports
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
+import com.getdieter.mobile.navigation.ToolPage
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.store.*
 import com.getdieter.mobile.tools.machineGlyph
@@ -37,6 +39,7 @@ import com.getdieter.mobile.tools.machineGlyph
 /** The account's trusted devices: add one by its code, remove one, and this device's trust. */
 @Composable
 internal fun DevicesScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val view by store.devices.slice.collectAsState()
     val busy by store.busy.collectAsState()
     val approvalError by store.devices.approvalError.collectAsState()
@@ -194,6 +197,7 @@ internal fun DevicesScreen(store: MobileStore) {
                         onClick = { resetting = true },
                     )
                 }
+            extensionSections(extensions.toolSections[ToolPage.DEVICES], store)
         }
     }
     removing?.let { device ->

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
+import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.store.*
@@ -31,6 +32,7 @@ internal fun machineGlyph(platform: String): Glyph =
 
 @Composable
 internal fun MachinesScreen(store: MobileStore) {
+    val extensions = LocalMobileExtensions.current
     val session by store.session.slice.collectAsState()
     val online = session.machines.count { it.online }
     Screen(
@@ -91,6 +93,7 @@ internal fun MachinesScreen(store: MobileStore) {
                     onClick = { store.push(MobileRoute.Machine(machine.id)) },
                 )
             }
+            extensionSections(extensions.toolSections[ToolPage.MACHINES], store)
         }
     }
 }
