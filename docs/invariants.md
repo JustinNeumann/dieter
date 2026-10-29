@@ -10,12 +10,16 @@ invariant, it is named; keep it passing rather than weakening it.
 - Dieter is a local Go daemon (`dieter`, also the CLI), a machine-only Go
   gateway (`dieter-gateway`), and native macOS, iOS and Android clients. Every
   card and standalone chat is one durable local harness conversation.
-- Dieter has no web UI. The public gateway root is intentionally 404; only
-  OAuth completion pages, health and gateway gRPC (including relay tunnels)
-  exist.
-- All three native clients are presentation-only clients of the shared Kotlin
-  core (`apps/kotlin/core`). Rules belong in the core, never in an app or the
-  shared Compose UI.
+- The gateway serves no UI. The public gateway root is intentionally 404;
+  only OAuth completion pages, health and gateway gRPC (including relay
+  tunnels) exist. A web client exists only as a presentation of a core that
+  runs in a trusted host the person already signs in to, such as the Home
+  Assistant add-on's web host. The browser holds no device key or session
+  ([ADR 0005](adr/0005-web-client.md)).
+- The native clients and the web client are presentation-only clients of the
+  shared Kotlin core (`apps/kotlin/core`). Rules belong in a core, never in an
+  app, the shared Compose UI or a host's UI extensions. A host's own features
+  bring their own core ([ADR 0005](adr/0005-web-client.md)).
 
 ## Releases and compatibility
 
