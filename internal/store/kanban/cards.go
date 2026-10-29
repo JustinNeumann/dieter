@@ -220,26 +220,35 @@ func (s *Store) listCardsContext(ctx context.Context, includeArchived bool) ([]m
 		}
 		paths = append(paths, archived...)
 	}
+	// One snapshot for the whole list: a snapshot per card (readCard) cost a
+	// transaction and cold caches for every card and its dependencies.
+	_, data, err := s.replica.ListSnapshot()
+	defer data.Close()
+	if err != nil {
+		return nil, err
+	}
 	result := make([]model.Card, 0, len(paths))
 	for _, path := range paths {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		item, err := s.readCard(path)
+		local, err := s.readLocalCard(path)
 		if errors.Is(err, home.ErrNotFound) {
 			continue
 		}
 		if err != nil {
 			return nil, err
 		}
+		item, ok, err := SharedCard(data, local.ID, local)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
 		if includeArchived || !item.Archived {
 			result = append(result, item)
 		}
-	}
-	_, data, err := s.replica.Snapshot()
-	defer data.Close()
-	if err != nil {
-		return nil, err
 	}
 	seen := map[string]bool{}
 	for _, card := range result {

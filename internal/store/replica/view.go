@@ -23,6 +23,10 @@ const peerViewCacheRecords = 256
 // one another. Admission fails explicitly if the storage budget is exhausted.
 const maxPeerSnapshots = 64
 
+// Projections over every card read the whole replica from memory up to this
+// size; larger replicas keep the bounded pages.
+const listSnapshotMaxBytes = 16 << 20
+
 // A view reads bounded pages at one replica revision. Domain readers pin a
 // snapshot; writer views check the revision between reads while holding the
 // central cross-process lock. Neither path mixes causal baselines. All callers
@@ -289,9 +293,17 @@ func (d PeerData) EachMatching(prefix, suffix string, visit func(crdt.Record) er
 // The lexical range uses only validated ASCII peer keys. Filtering is evaluated
 // before the page bound so an unrelated namespace cannot starve a KV page.
 func readPeerPage(tx *sql.Tx, prefix, suffix, after string, maxBytes int, accept func(crdt.Record) bool) ([]crdt.Record, bool, error) {
-	query := "SELECT key,value FROM peer_records WHERE key>? AND key>=? AND key<? AND (?='' OR substr(key,-length(?))=?) ORDER BY key"
+	// Give SQLite one lower bound: of key>after AND key>=prefix it seeks to the
+	// first, and after is "" on the first page, so every page of every prefix
+	// walked all keys sorting before it.
+	query := "SELECT key,value FROM peer_records WHERE key>=? AND key<? AND (?='' OR substr(key,-length(?))=?) ORDER BY key"
+	lower := prefix
+	if after >= prefix {
+		query = "SELECT key,value FROM peer_records WHERE key>? AND key<? AND (?='' OR substr(key,-length(?))=?) ORDER BY key"
+		lower = after
+	}
 	upper := prefix + "\x7f"
-	rows, err := tx.Query(query, after, prefix, upper, suffix, suffix, suffix)
+	rows, err := tx.Query(query, lower, upper, suffix, suffix, suffix)
 	if err != nil {
 		return nil, false, err
 	}
@@ -387,7 +399,61 @@ func (d PeerData) primeEntity(kind, id string) {
 	d.Fail(err)
 	for field := range schema.DomainFields[kind] {
 		r := found[field]
-		raw, _ := json.Marshal(r)
-		d.view.remember(crdt.Key(kind, id+"."+field), r, len(raw))
+		d.view.remember(crdt.Key(kind, id+"."+field), r, recordSize(r))
 	}
+}
+
+// recordSize approximates the encoded size of r for the cache budget; encoding
+// every primed record only to measure it cost a tenth of a card list.
+func recordSize(r crdt.Record) int {
+	n := 32 + len(r.Kind) + len(r.ID)
+	for _, v := range r.Versions {
+		n += 48 + (len(v.Value)+len(v.Provenance))*4/3 + 24*len(v.Clock)
+	}
+	return n
+}
+
+// materialize loads every record of a pinned domain snapshot into an indexed
+// in-memory state owned by the caller, or reports false when the replica holds
+// more than maxBytes. One ordered scan replaces the range and point reads that
+// a projection over every card issues for each card and its dependencies.
+func (d PeerData) materialize(maxBytes int64) (PeerData, bool, error) {
+	var state PeerData
+	d.view.read(func(tx *sql.Tx) error {
+		var size int64
+		if err := tx.QueryRow("SELECT record_bytes FROM peer_metadata WHERE id=1").Scan(&size); err != nil || size > maxBytes {
+			return err
+		}
+		rows, err := tx.Query("SELECT key,value FROM peer_records ORDER BY key")
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		records := map[string]crdt.Record{}
+		for rows.Next() {
+			var key string
+			var raw []byte
+			if err = rows.Scan(&key, &raw); err != nil {
+				return err
+			}
+			var r crdt.Record
+			if r, err = decodePeerRecord(raw); err != nil {
+				return err
+			}
+			if key != crdt.Key(r.Kind, r.ID) {
+				return fault.New(fault.Invalid, "invalid peer record key")
+			}
+			records[key] = r
+		}
+		if err = rows.Err(); err != nil {
+			return err
+		}
+		state = PeerData{State: crdt.State{Records: records}, Epoch: d.view.epoch, Sequence: d.view.sequence}
+		return nil
+	})
+	if err := d.Err(); err != nil || state.Records == nil {
+		return PeerData{}, false, err
+	}
+	indexPeerData(&state)
+	return state, true, nil
 }

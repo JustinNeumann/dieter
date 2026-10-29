@@ -22,6 +22,12 @@ func (s *Store) ReadPoolInUse(account string) int {
 	return s.peerReadDBs[account].Stats().InUse
 }
 
+// SetListSnapshotMaxBytes changes the bound of ListSnapshot for this store.
+func (s *Store) SetListSnapshotMaxBytes(n int64) { s.listSnapshotMaxBytes = n }
+
+// InMemory reports whether the data is a materialized state, not a SQL view.
+func (d PeerData) InMemory() bool { return d.view == nil }
+
 // SnapshotSlots is the bound on concurrent read snapshots.
 func (s *Store) SnapshotSlots() int { return cap(s.peerSnapshotSlots) }
 

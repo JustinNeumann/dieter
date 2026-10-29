@@ -64,6 +64,27 @@ func (s *Store) Snapshot() (PeerIdentity, PeerData, error) {
 	return identity, data, err
 }
 
+// ListSnapshot is Snapshot for projections over every card. Up to the
+// replica's list snapshot bound it returns the pinned revision as an indexed
+// in-memory state that this caller owns; larger replicas get the paging
+// snapshot. Close the data.
+func (s *Store) ListSnapshot() (PeerIdentity, PeerData, error) {
+	identity, data, err := s.Snapshot()
+	if err != nil || data.view == nil {
+		return identity, data, err
+	}
+	state, ok, err := data.materialize(s.listSnapshotMaxBytes)
+	if err != nil {
+		data.Close()
+		return identity, PeerData{}, err
+	}
+	if !ok {
+		return identity, data, nil
+	}
+	data.Close()
+	return identity, state, nil
+}
+
 // checkEnrollmentBinding refuses to publish as a peer identity that this
 // machine no longer holds. After `dieter daemon unenroll` and a new enrollment
 // the daemon credential (daemon/identity.json) names a new daemon ID while

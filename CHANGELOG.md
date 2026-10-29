@@ -6,7 +6,22 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
-## Fork: server release v0.6.429-antigravity.4 (unreleased)
+## Fork: server release v0.6.429-antigravity.5 (unreleased)
+
+- Board state is several times faster to rebuild. `dieter status`, `dieter project list` and every client that
+  asks for the state of all projects rebuild it after each metadata change, which running agents cause
+  several times a second, and the rebuild held the store's writer lock: card creates, moves and transcript
+  appends waited behind it. On a Raspberry Pi 5 with 340 cards a rebuild took 0.96 s and now takes 0.22 s
+  (4.3×), on 4 cores of an x86 machine 390 ms and now 100 ms; the state is byte-identical.
+  - Prefix reads of the peer store gave SQLite two lower bounds (`key>after AND key>=prefix`); it seeked to the
+    first, which is empty on the first page, and walked every key sorting before the prefix, once per card and
+    per dependency. They now give one bound.
+  - A card list reads one snapshot instead of opening a snapshot (a transaction and cold caches) per card, and
+    up to 16 MB of peer records it reads the whole replica once into memory that the list owns. Larger replicas
+    keep the bounded pages.
+  - Primed records are no longer encoded to JSON only to measure their size.
+
+## Fork: server release v0.6.429-antigravity.4 (2026-10-28)
 
 - A machine that enrolls again under the same account (`dieter daemon unenroll`, then a new enrollment; the
   Home Assistant add-on's **Re-enroll**) keeps its working trees usable: at the first peer sync round that

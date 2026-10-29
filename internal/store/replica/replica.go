@@ -31,9 +31,12 @@ type Store struct {
 	peerHooks        Hooks
 	ownerKeyCache    ownerKeyCache
 	snapshotRecords  snapshotRecordCache
+	// listSnapshotMaxBytes bounds the replica size up to which ListSnapshot
+	// loads every record into memory.
+	listSnapshotMaxBytes int64
 }
 
 // New returns the replica of dir.
 func New(dir *home.Dir) *Store {
-	return &Store{home: dir, peerSnapshotSlots: make(chan struct{}, maxPeerSnapshots)}
+	return &Store{home: dir, peerSnapshotSlots: make(chan struct{}, maxPeerSnapshots), listSnapshotMaxBytes: listSnapshotMaxBytes}
 }
