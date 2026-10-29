@@ -16,6 +16,7 @@ import com.getdieter.core.mail.MailRules
 import com.getdieter.core.mail.MailSurface
 import com.getdieter.core.mail.MailView
 import com.getdieter.core.navigation.OpenRequests
+import com.getdieter.core.navigation.OpenTarget
 import com.getdieter.core.notifications.NotificationResponses
 import com.getdieter.core.notifications.NotificationRoute
 import com.getdieter.core.outbox.OutboxPolicy
@@ -179,18 +180,7 @@ internal suspend fun CoreRuntime.respond(
         NotificationResponses.route(
             response.key,
             response.action,
-            open = { cardId ->
-                val view = workspace.state.value
-                OpenRequests.resolve(
-                    outbox.view.value.resolve(cardId),
-                    view.allItems,
-                    inInbox = false,
-                    loading = !view.loaded,
-                    phase = connection.state.value.phase,
-                    catchingUp =
-                        !MachineSyncs.current(connection.machines.value, connection.syncs.value),
-                )
-            },
+            open = ::openTarget,
             canFinish = { card ->
                 OutboxPolicy.isServerBacked(card.id) &&
                     Lanes.done(workspace.directoryProjection.board(card.board_id)) != null
@@ -214,6 +204,34 @@ internal suspend fun CoreRuntime.respond(
             is NotificationRoute.OpenConversation -> NotificationTarget(card_id = route.cardId)
             NotificationRoute.Inbox -> NotificationTarget(inbox = Step())
             NotificationRoute.None -> none
+        }
+    return Result(notification_target = target)
+}
+
+/** Where a request to open the conversation [cardId] lands now ([OpenRequests.resolve]). */
+private fun CoreRuntime.openTarget(cardId: String): OpenTarget {
+    val view = workspace.state.value
+    return OpenRequests.resolve(
+        outbox.view.value.resolve(cardId),
+        view.allItems,
+        inInbox = false,
+        loading = !view.loaded,
+        phase = connection.state.value.phase,
+        catchingUp = !MachineSyncs.current(connection.machines.value, connection.syncs.value),
+    )
+}
+
+/**
+ * Where a link to the conversation [cardId] leads: the conversation where it belongs, its ID while
+ * the account may still bring it, else the Inbox.
+ */
+internal fun CoreRuntime.openRequest(cardId: String): Result {
+    if (cardId.isBlank()) invalid("Name the conversation to open.")
+    val target =
+        when (val open = openTarget(cardId)) {
+            is OpenTarget.Conversation -> NotificationTarget(card_id = open.card.id)
+            OpenTarget.Wait -> NotificationTarget(card_id = cardId)
+            OpenTarget.Inbox -> NotificationTarget(inbox = Step())
         }
     return Result(notification_target = target)
 }

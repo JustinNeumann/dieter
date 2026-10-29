@@ -120,7 +120,8 @@ class ClientApi(private val runtime: CoreRuntime, private val screenHost: Screen
         }
         command.begin_sign_in?.let {
             return Result(
-                sign_in_started = SignInStarted(runtime.beginSignIn(gateway(it.gateway_url, "")))
+                sign_in_started =
+                    SignInStarted(runtime.beginSignIn(gateway(it.gateway_url, ""), it.redirect_uri))
             )
         }
         command.complete_sign_in?.let {
@@ -491,6 +492,9 @@ class ClientApi(private val runtime: CoreRuntime, private val screenHost: Screen
         }
         command.notification_response?.let {
             return runtime.respond(it, surfaces.mail)
+        }
+        command.open_conversation_request?.let {
+            return runtime.openRequest(it.card_id)
         }
         command.devices?.let { devices ->
             devices.refresh?.let { runtime.refreshDevices() }

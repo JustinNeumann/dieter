@@ -110,6 +110,8 @@ message Command {
     MailCommand mail = 84;
     // A tap on, or an action of, a notification the core posted.
     NotificationResponse notification_response = 85;
+    // A request from outside the app to open a conversation, e.g. a link.
+    OpenConversationRequest open_conversation_request = 86;
   }
 }
 
@@ -130,7 +132,14 @@ message AdoptSession {
   string pairing_code = 4;
 }
 
-message BeginSignIn { string gateway_url = 1; }
+message BeginSignIn {
+  string gateway_url = 1;
+  // Where the gateway sends the browser back for this attempt, e.g. the web
+  // client's page under the address the person reached it by. Only a core
+  // configured for it (RuntimeConfig.oauthRedirectPerAttempt) uses it, and
+  // there it is required; other platforms leave it empty.
+  string redirect_uri = 2;
+}
 message CompleteSignIn { string callback_url = 1; }
 
 // Forgets the active gateway's session and everything this device kept for
@@ -1253,7 +1262,8 @@ message Result {
     ChannelsSlice channels = 46;
     // The mail surface after a mail command.
     MailSlice mail = 47;
-    // Where a notification response leads (NotificationResponse).
+    // Where a notification response or an open request leads
+    // (NotificationResponse, OpenConversationRequest).
     NotificationTarget notification_target = 48;
   }
 }
@@ -4544,6 +4554,11 @@ message NotificationResponse {
   string key = 1;
   string action = 2;
 }
+
+// Opens a conversation from outside the app (a link to it): where it belongs,
+// the Inbox once it is gone. While the workspace may still bring it, the
+// answer is its ID. Answered by notification_target.
+message OpenConversationRequest { string card_id = 1; }
 
 // Where the app goes after a notification response. Absent fields: stay.
 message NotificationTarget {

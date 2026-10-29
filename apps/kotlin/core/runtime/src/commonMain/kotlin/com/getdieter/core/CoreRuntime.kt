@@ -111,6 +111,12 @@ data class RuntimeConfig(
     val clientVersion: String,
     /** The platform's OAuth callback, e.g. `dieter-android://oauth/callback`. */
     val oauthRedirectUri: String,
+    /**
+     * Each sign-in names the address the gateway sends the browser back to
+     * (`BeginSignIn.redirect_uri`), for a client reached under several addresses, such as a web
+     * client behind a proxy. Callbacks still arrive under [oauthRedirectUri].
+     */
+    val oauthRedirectPerAttempt: Boolean = false,
     /** Only hosts that can run a daemon themselves (macOS, JVM) try loopback routes. */
     val includeLoopbackRoutes: Boolean,
     /** Prefix of a newly generated sync client ID, e.g. `android` or `mac`. */
@@ -130,7 +136,14 @@ class CoreRuntime(val platform: Platform, val config: RuntimeConfig) {
     val credentials = Credentials(platform.secureStore)
     val accounts = AccountStore(storage)
     val signIn =
-        SignIn(storage, platform.http, credentials, config.oauthRedirectUri, platform.clock)
+        SignIn(
+            storage,
+            platform.http,
+            credentials,
+            config.oauthRedirectUri,
+            platform.clock,
+            perAttempt = config.oauthRedirectPerAttempt,
+        )
     val workspace = WorkspaceStore(platform.clock)
 
     /** The account view from every machine's change stream. */
@@ -467,7 +480,9 @@ class CoreRuntime(val platform: Platform, val config: RuntimeConfig) {
         withContext(dispatcher, block)
 
     /** The URL to open for GitHub sign-in to [gateway]. */
-    suspend fun beginSignIn(gateway: Gateway): String = onCore { signIn.begin(gateway) }
+    suspend fun beginSignIn(gateway: Gateway, redirectUri: String = ""): String = onCore {
+        signIn.begin(gateway, redirectUri)
+    }
 
     /** Completes sign-in from the OAuth callback URL and connects. */
     suspend fun completeSignIn(callbackUrl: String): Gateway = onCore {

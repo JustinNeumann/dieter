@@ -24,6 +24,10 @@ import okio.ByteString.Companion.encodeUtf8
  * GitHub OAuth with PKCE (RFC 7636) through the gateway. The platform opens [begin]'s URL in a
  * browser and hands the callback URL to [complete]. The pending attempt is persisted, so a callback
  * delivered after the app was relaunched still completes within [EXPIRY].
+ *
+ * With [perAttempt] every attempt names the address the gateway sends the browser back to (a web
+ * client reached under several addresses); the platform still hands the callback over under
+ * [redirectUri], and [complete] accepts it under either.
  */
 class SignIn(
     private val storage: CoreStorage,
@@ -31,13 +35,16 @@ class SignIn(
     private val credentials: Credentials,
     private val redirectUri: String,
     private val clock: Clock = Clock.System,
+    private val perAttempt: Boolean = false,
 ) {
     /**
      * Starts an attempt for [gateway] and returns the URL to open. Replaces any previous attempt.
+     * [returnTo] is the attempt's own return address; required with [perAttempt], ignored without.
      */
-    fun begin(gateway: Gateway): String {
+    fun begin(gateway: Gateway, returnTo: String = ""): String {
         if (!gateway.secure)
             throw CoreException(FailureKind.PERMANENT, "Remote sign-in requires an HTTPS gateway.")
+        val target = if (perAttempt) returnAddress(returnTo) else redirectUri
         val verifier = randomUrlToken(48)
         val challenge = verifier.encodeUtf8().sha256().toByteArray().base64Url()
         storage.write(
@@ -47,15 +54,37 @@ class SignIn(
                     gateway = gateway.record(),
                     verifier = verifier,
                     created_at_millis = clock.now().toEpochMilliseconds(),
+                    redirect_uri = if (perAttempt) target else "",
                 )
             ),
         )
-        return "${gateway.httpBase}/auth/github/start?native_redirect_uri=${Urls.encode(redirectUri)}" +
+        return "${gateway.httpBase}/auth/github/start?native_redirect_uri=${Urls.encode(target)}" +
             "&native_code_challenge=${Urls.encode(challenge)}"
     }
 
     /** Whether [url] is this client's OAuth callback. */
-    fun isCallback(url: String): Boolean = url.substringBefore('?') == redirectUri
+    fun isCallback(url: String): Boolean {
+        val address = url.substringBefore('?')
+        if (address == redirectUri) return true
+        if (!perAttempt) return false
+        val pending = storage.read(PENDING)?.let(PendingSignIn.ADAPTER::decode)
+        return pending != null && pending.redirect_uri.isNotEmpty() && address == pending.redirect_uri
+    }
+
+    /** An absolute http(s) address without query or fragment: the gateway appends its own. */
+    private fun returnAddress(value: String): String {
+        val address = value.trim()
+        if (address.isEmpty())
+            throw CoreException(
+                FailureKind.PERMANENT,
+                "Sign-in needs the address to come back to. Open Dieter through its usual address.",
+            )
+        val scheme = address.substringBefore("://", "").lowercase()
+        val host = address.substringAfter("://", "").substringBefore('/')
+        if (scheme !in setOf("https", "http") || host.isEmpty() || '?' in address || '#' in address)
+            throw CoreException(FailureKind.PERMANENT, "That return address cannot be used for sign-in.")
+        return address
+    }
 
     /**
      * Exchanges the callback's code for a session token, stores it, and returns the gateway that

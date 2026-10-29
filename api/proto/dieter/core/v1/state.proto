@@ -30,6 +30,8 @@ message PendingSignIn {
   GatewayRecord gateway = 2;
   string verifier = 3;
   int64 created_at_millis = 5;
+  // The attempt's own return address (BeginSignIn.redirect_uri), if any.
+  string redirect_uri = 6;
 }
 
 // Composer text per conversation, newest first. Attachments and selections

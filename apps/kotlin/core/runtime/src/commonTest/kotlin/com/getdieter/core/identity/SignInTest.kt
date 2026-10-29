@@ -9,7 +9,9 @@ import com.getdieter.core.testing.MemorySecureStore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.test.runTest
 import okio.Path.Companion.toPath
@@ -49,6 +51,29 @@ class SignInTest {
             signIn.complete("$redirect?code=real")
         }
         assertEquals(2, exchanges.size)
+    }
+
+    @Test
+    fun aPerAttemptReturnAddressGoesToTheGatewayAndItsCallbackCompletes() = runTest {
+        val web = SignIn(CoreStorage(FakeFileSystem(), "/state".toPath()), http, Credentials(secrets), redirect, clock, perAttempt = true)
+        val page = "https://ha.example/app/addon_dieter/next/signin"
+        assertFailsWith<CoreException>("the address is required") { web.begin(gateway) }
+        assertFailsWith<CoreException> { web.begin(gateway, "$page?x=1") }
+        assertFailsWith<CoreException> { web.begin(gateway, "javascript:alert(1)") }
+        val url = web.begin(gateway, page)
+        assertTrue("native_redirect_uri=${Urls.encode(page)}&" in url, url)
+        assertTrue(web.isCallback("$page?code=real"))
+        assertTrue(web.isCallback("$redirect?code=real"), "the platform hands callbacks over under its own address")
+        assertFalse(web.isCallback("https://elsewhere.example/next/signin?code=real"))
+        assertEquals(gateway.origin, web.complete("$page?code=real").origin)
+        assertFalse(web.isCallback("$page?code=real"), "the attempt ended")
+    }
+
+    @Test
+    fun withoutPerAttemptTheConfiguredAddressIsUsed() = runTest {
+        val url = signIn.begin(gateway, "https://ha.example/next/signin")
+        assertTrue("native_redirect_uri=${Urls.encode(redirect)}&" in url, url)
+        assertFalse(signIn.isCallback("https://ha.example/next/signin?code=real"))
     }
 
     @Test
