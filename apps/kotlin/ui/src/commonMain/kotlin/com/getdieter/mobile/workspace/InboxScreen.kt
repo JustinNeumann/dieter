@@ -365,7 +365,7 @@ private fun InboxRow(
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (row.chat) {
-                            Icon(Glyph.CHAT, "Chat", tint = palette.secondaryLabel, size = 13.dp)
+                            Icon(Glyph.CHAT, null, tint = palette.secondaryLabel, size = 13.dp)
                             Spacer(Modifier.width(4.dp))
                         }
                         Text(
@@ -499,7 +499,7 @@ private fun MaterialInboxRow(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                 ) {
                     if (row.chat)
-                        Icon(Glyph.CHAT, "Chat", tint = palette.secondaryLabel, size = 13.dp)
+                        Icon(Glyph.CHAT, null, tint = palette.secondaryLabel, size = 13.dp)
                     Text(
                         listOfNotNull(
                                 row.project_name.ifEmpty { null },

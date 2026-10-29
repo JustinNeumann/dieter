@@ -14,7 +14,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -85,6 +88,39 @@ internal class MenuState {
 }
 
 @Composable internal fun rememberMenuState() = remember { MenuState() }
+
+/**
+ * What floats over the screens (menus, sheets, dialogs, the find bar, snackbars), as bounds in
+ * window pixels. A platform view placed above Compose's drawing (an HTML island on the web) keeps
+ * clear of these instead of hiding them.
+ */
+internal object FloatingLayers {
+    val bounds = mutableStateMapOf<Any, Rect>()
+
+    /** Bounds of a layer that covers the whole window, e.g. a sheet's or dialog's scrim. */
+    val window = Rect(Offset(-1e6f, -1e6f), Size(2e6f, 2e6f))
+}
+
+/** Reports this element's bounds to [FloatingLayers] while it is shown. */
+internal fun Modifier.floating(): Modifier = composed {
+    val key = remember { Any() }
+    DisposableEffect(key) { onDispose { FloatingLayers.bounds.remove(key) } }
+    onGloballyPositioned {
+        val bounds = it.boundsInWindow()
+        if (bounds.isEmpty) FloatingLayers.bounds.remove(key)
+        else if (FloatingLayers.bounds[key] != bounds) FloatingLayers.bounds[key] = bounds
+    }
+}
+
+/** Reports a window-wide layer (sheet, dialog, modal screen) to [FloatingLayers] while composed. */
+@Composable
+internal fun CoversWindow() {
+    DisposableEffect(Unit) {
+        val key = Any()
+        FloatingLayers.bounds[key] = FloatingLayers.window
+        onDispose { FloatingLayers.bounds.remove(key) }
+    }
+}
 
 /** Anchors a menu to its content: a native UIMenu on iOS, a Material dropdown on Android. */
 @Composable
@@ -169,6 +205,7 @@ internal fun ConfirmDialog(
         }
         return
     }
+    CoversWindow()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -222,6 +259,7 @@ internal fun PromptDialog(
         return
     }
     var value by remember { mutableStateOf(initial) }
+    CoversWindow()
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
@@ -284,6 +322,7 @@ internal fun Sheet(
         return
     }
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = size == SheetSize.LARGE)
+    CoversWindow()
     ModalBottomSheet(onDismiss, sheetState = state, containerColor = colors.surfaceContainerLow) {
         Row(
             Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, bottom = 8.dp),

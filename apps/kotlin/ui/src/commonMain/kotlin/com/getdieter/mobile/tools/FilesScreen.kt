@@ -5,26 +5,35 @@ package com.getdieter.mobile.tools
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.getdieter.client.v1.*
 import com.getdieter.core.files.FilePaths
+import com.getdieter.core.presentation.Markdown
+import com.getdieter.core.presentation.MarkdownBlock
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.platform.*
 import com.getdieter.mobile.store.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private fun String.trimSlashes() = trim('/').trim()
 
@@ -416,28 +425,99 @@ private fun DocumentScreen(store: MobileStore, route: MobileRoute.FilePath) {
                             glyph = Glyph.EYE,
                         )
                     }
-                markdown && isMarkdown ->
-                    Column(
-                        Modifier.fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 20.dp, vertical = 12.dp)
-                            .padding(bottom = padding.calculateBottomPadding())
-                    ) {
-                        RichText(text)
+                markdown && isMarkdown && nativeMarkdownViews -> {
+                    // The platform's own text (HTML on the web): selection, find and reading
+                    // aloud as on any page.
+                    val native = remember(route.path) { NativeFind() }
+                    Findable(text, { emptyList() }, {}, placeholder = "Find in file", native = native) {
+                        NativeMarkdownView(
+                            text,
+                            Modifier.fillMaxSize()
+                                .padding(bottom = padding.calculateBottomPadding())
+                                .testTag("file-preview"),
+                            {},
+                            { false },
+                            diagrams = false,
+                            find = native,
+                            onScrolled = {},
+                        )
                     }
-                else ->
-                    BasicTextField(
+                }
+                markdown && isMarkdown -> {
+                    // Lazy blocks: a long document composes what shows, and find can scroll to a
+                    // block. One selection spans the whole document.
+                    val blocks by
+                        produceState<List<MarkdownBlock>?>(null, text) {
+                            value = withContext(Dispatchers.Default) { Markdown.parse(text) }
+                        }
+                    val list = rememberLazyListState()
+                    val clearance = with(LocalDensity.current) { 72.dp.roundToPx() }
+                    Findable(
+                        blocks,
+                        { blocks.orEmpty().map(::findText) },
+                        { hit -> list.revealHit(hit.piece, hit.fraction, clearance) },
+                        placeholder = "Find in file",
+                    ) {
+                        SelectionContainer {
+                            LazyColumn(
+                                Modifier.fillMaxSize().testTag("file-preview"),
+                                state = list,
+                                contentPadding =
+                                    PaddingValues(
+                                        top = 12.dp,
+                                        bottom = 12.dp + padding.calculateBottomPadding(),
+                                    ),
+                            ) {
+                                blocks?.let {
+                                    markdownDocument(
+                                        it,
+                                        {},
+                                        key = "file-${route.path}",
+                                        horizontalPadding = 20.dp,
+                                        selectable = false,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    val scroll = rememberScrollState()
+                    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+                    val clearance = with(LocalDensity.current) { 72.dp.toPx() }
+                    Findable(
                         text,
-                        { store.files.editBuffer(view.document_key, document.content, it) },
-                        Modifier.fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .padding(bottom = padding.calculateBottomPadding())
-                            .testTag("file-editor")
-                            .semantics { contentDescription = "File contents" },
-                        textStyle = type.mono.copy(color = palette.label),
-                        cursorBrush = SolidColor(if (apple) palette.info else colors.primary),
-                    )
+                        { listOf(text) },
+                        { hit ->
+                            layout?.let {
+                                val line = it.getLineForOffset(hit.offset.coerceAtMost(text.length))
+                                scroll.animateScrollTo(
+                                    (it.getLineTop(line) - clearance).toInt().coerceAtLeast(0)
+                                )
+                            }
+                        },
+                        placeholder = "Find in file",
+                    ) {
+                        val query = LocalFindQuery.current
+                        val found = findHighlight()
+                        BasicTextField(
+                            text,
+                            { store.files.editBuffer(view.document_key, document.content, it) },
+                            Modifier.fillMaxSize()
+                                .verticalScroll(scroll)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .padding(bottom = padding.calculateBottomPadding())
+                                .testTag("file-editor")
+                                .semantics { contentDescription = "File contents" },
+                            textStyle = type.mono.copy(color = palette.label),
+                            cursorBrush = SolidColor(if (apple) palette.info else colors.primary),
+                            visualTransformation =
+                                if (query.isBlank()) VisualTransformation.None
+                                else remember(query, found) { FindTransformation(query, found) },
+                            onTextLayout = { layout = it },
+                        )
+                    }
+                }
             }
         }
     }

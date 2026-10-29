@@ -1,15 +1,18 @@
 package com.getdieter.mobile.mail
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -183,76 +186,119 @@ internal fun MailMessageScreen(
                         Markdown.parse(body)
                     }
         }
-    Screen(chrome) {
-        LazyColumn(
-            Modifier.fillMaxSize().testTag("mail-message"),
-            state = listState,
-            contentPadding =
-                PaddingValues(
-                    top = padding.calculateTopPadding(),
-                    bottom = 24.dp + padding.calculateBottomPadding(),
-                ),
-        ) {
-            item("header") {
-                Header(
-                    reader,
-                    row,
-                    onOpenConversation = {
-                        reader?.card_id?.takeIf { it.isNotEmpty() }?.let(store::openConversation)
-                    },
-                )
-            }
-            val stale = reader?.stale ?: row?.stale.orEmpty()
-            if (stale.isNotEmpty())
-                item("stale") {
-                    Banner(
-                        "May be out of date",
-                        stale,
-                        Modifier.padding(horizontal = ScreenMargin, vertical = 6.dp),
-                        tone = Tone.WARNING,
-                        glyph = Glyph.OFFLINE,
-                    )
+    val stale = reader?.stale ?: row?.stale.orEmpty()
+    val state =
+        when {
+            reader == null && row == null -> BodyState.GONE
+            reader != null && reader.unavailable.isNotEmpty() -> BodyState.UNAVAILABLE
+            reader == null || reader.loading -> BodyState.LOADING
+            else -> BodyState.READY
+        }
+    val openConversation = {
+        reader?.card_id?.takeIf { it.isNotEmpty() }?.let(store::openConversation)
+        Unit
+    }
+    if (nativeMarkdownViews) {
+        // The body is the platform's own text (HTML on the web) and scrolls by itself; the header
+        // stays above it and folds to the subject once the body is scrolled.
+        val native = remember(route) { NativeFind() }
+        var scrolled by remember(route) { mutableStateOf(false) }
+        Screen(chrome) {
+            Findable(
+                body,
+                { emptyList() },
+                {},
+                top = padding.calculateTopPadding(),
+                placeholder = "Find in message",
+                native = native,
+            ) {
+                Column(
+                    Modifier.fillMaxSize()
+                        .padding(top = padding.calculateTopPadding())
+                        .testTag("mail-message")
+                ) {
+                    SelectionContainer {
+                        Header(reader, row, openConversation, compact = scrolled)
+                    }
+                    if (stale.isNotEmpty()) StaleBanner(stale)
+                    Hairline(Modifier.padding(horizontal = ScreenMargin).padding(top = 12.dp))
+                    if (state == BodyState.READY && body.isNotEmpty())
+                        NativeMarkdownView(
+                            body,
+                            Modifier.weight(1f)
+                                .fillMaxWidth()
+                                .padding(bottom = padding.calculateBottomPadding())
+                                .testTag("mail-body"),
+                            openLink,
+                            linkable,
+                            diagrams = true,
+                            find = native,
+                            onScrolled = { scrolled = it },
+                        )
+                    else BodyPlaceholder(if (state == BodyState.READY) BodyState.LOADING else state, reader)
                 }
-            item("rule") { Hairline(Modifier.padding(horizontal = ScreenMargin, vertical = 12.dp)) }
-            val shown = blocks
-            when {
-                reader == null && row == null ->
-                    item("gone") {
-                        EmptyState(
-                            Glyph.MAIL,
-                            "Message unavailable",
-                            "It was deleted or its machine is no longer in your account.",
-                        )
-                    }
-                reader != null && reader.unavailable.isNotEmpty() ->
-                    item("unavailable") {
-                        EmptyState(
-                            Glyph.OFFLINE,
-                            "The message can't be shown",
-                            reader.unavailable,
-                            Modifier.testTag("mail-unavailable"),
-                        )
-                    }
-                reader == null || reader.loading || shown == null ->
-                    item("loading") {
-                        Box(
-                            Modifier.fillMaxWidth().padding(vertical = 48.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Spinner(Modifier.size(26.dp))
-                        }
-                    }
-                else ->
-                    markdownDocument(
-                        shown,
-                        openLink,
-                        linkable = linkable,
-                        linkKey = root,
-                        key = "body-${route.daemonId}-${route.id}",
-                        diagrams = true,
-                    )
             }
         }
+    } else {
+    // A 128 KiB body parses off the main thread; inline trees parse as blocks show.
+    val blocks by
+        produceState<List<MarkdownBlock>?>(null, body) {
+            value =
+                if (body.isEmpty()) emptyList()
+                else
+                    withContext(Dispatchers.Default) {
+                        Markdown.parse(body)
+                    }
+        }
+    // The body's blocks follow the header, the banner and the rule.
+    val bodyStart = if (stale.isNotEmpty()) 3 else 2
+    val findClearance = with(LocalDensity.current) { 72.dp.roundToPx() }
+    Screen(chrome) {
+        Findable(
+            blocks,
+            { blocks.orEmpty().map(::findText) },
+            { hit -> listState.revealHit(bodyStart + hit.piece, hit.fraction, findClearance) },
+            top = padding.calculateTopPadding(),
+            placeholder = "Find in message",
+        ) {
+            // One selection across the header and every block, so a copy can span paragraphs.
+            SelectionContainer {
+                LazyColumn(
+                    Modifier.fillMaxSize().testTag("mail-message"),
+                    state = listState,
+                    contentPadding =
+                        PaddingValues(
+                            top = padding.calculateTopPadding(),
+                            bottom = 24.dp + padding.calculateBottomPadding(),
+                        ),
+                ) {
+                    item("header") { Header(reader, row, openConversation) }
+                    if (stale.isNotEmpty()) item("stale") { StaleBanner(stale) }
+                    item("rule") {
+                        Hairline(Modifier.padding(horizontal = ScreenMargin, vertical = 12.dp))
+                    }
+                    val shown = blocks
+                    if (state == BodyState.READY && shown != null)
+                        markdownDocument(
+                            shown,
+                            openLink,
+                            linkable = linkable,
+                            linkKey = root,
+                            key = "body-${route.daemonId}-${route.id}",
+                            diagrams = true,
+                            selectable = false,
+                        )
+                    else
+                        item("placeholder") {
+                            BodyPlaceholder(
+                                if (state == BodyState.READY) BodyState.LOADING else state,
+                                reader,
+                            )
+                        }
+                }
+            }
+        }
+    }
     }
     if (deleting)
         ConfirmDialog(
@@ -269,8 +315,58 @@ internal fun MailMessageScreen(
         )
 }
 
+private enum class BodyState {
+    GONE,
+    UNAVAILABLE,
+    LOADING,
+    READY,
+}
+
 @Composable
-private fun Header(reader: MailReader?, row: MailRow?, onOpenConversation: () -> Unit) {
+private fun StaleBanner(stale: String) =
+    Banner(
+        "May be out of date",
+        stale,
+        Modifier.padding(horizontal = ScreenMargin, vertical = 6.dp),
+        tone = Tone.WARNING,
+        glyph = Glyph.OFFLINE,
+    )
+
+/** What shows instead of a body: why there is none, or that it loads. */
+@Composable
+private fun BodyPlaceholder(state: BodyState, reader: MailReader?) {
+    when (state) {
+        BodyState.GONE ->
+            EmptyState(
+                Glyph.MAIL,
+                "Message unavailable",
+                "It was deleted or its machine is no longer in your account.",
+            )
+        BodyState.UNAVAILABLE ->
+            EmptyState(
+                Glyph.OFFLINE,
+                "The message can't be shown",
+                reader?.unavailable.orEmpty(),
+                Modifier.testTag("mail-unavailable"),
+            )
+        else ->
+            Box(
+                Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Spinner(Modifier.size(26.dp))
+            }
+    }
+}
+
+/** [compact] keeps the subject only, for a body that scrolls on its own. */
+@Composable
+private fun Header(
+    reader: MailReader?,
+    row: MailRow?,
+    onOpenConversation: () -> Unit,
+    compact: Boolean = false,
+) {
     val subject = reader?.subject ?: row?.subject.orEmpty()
     val important = reader?.important ?: row?.important ?: false
     Column(
@@ -292,6 +388,8 @@ private fun Header(reader: MailReader?, row: MailRow?, onOpenConversation: () ->
                 style = type.caption.copy(fontWeight = FontWeight.SemiBold),
                 color = palette.destructive,
             )
+        AnimatedVisibility(!compact) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MailAvatar(
                 reader?.initials ?: row?.initials.orEmpty(),
@@ -335,5 +433,7 @@ private fun Header(reader: MailReader?, row: MailRow?, onOpenConversation: () ->
                         color = palette.secondaryLabel,
                     )
             }
+        }
+        }
     }
 }

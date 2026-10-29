@@ -26,6 +26,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -38,6 +39,7 @@ import com.getdieter.client.v1.*
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.board.*
 import com.getdieter.mobile.creation.*
+import com.getdieter.core.presentation.Markdown
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.navigation.*
@@ -241,8 +243,31 @@ private fun Transcript(
                 )
                 .tool_output
     }
+    val findClearance = with(LocalDensity.current) { 72.dp.roundToPx() }
     Column(Modifier.fillMaxSize().imePadding()) {
         Box(Modifier.weight(1f)) {
+            Findable(
+                view.timeline,
+                {
+                    view.timeline.map { row ->
+                        Markdown.parse(rowText(row, view)).joinToString("\n", transform = ::findText)
+                    }
+                },
+                { hit ->
+                    following = false
+                    val before =
+                        listOf(
+                                view.error.isNotBlank(),
+                                view.has_earlier,
+                                !state?.unsent_task.isNullOrBlank(),
+                            )
+                            .count { it }
+                    list.revealHit(before + hit.piece, hit.fraction, findClearance)
+                },
+                Modifier.fillMaxSize(),
+                top = padding.calculateTopPadding(),
+                placeholder = "Find in conversation",
+            ) {
             LazyColumn(
                 Modifier.fillMaxSize().nestedScroll(userScroll).testTag("conversation-timeline"),
                 state = list,
@@ -371,6 +396,7 @@ private fun Transcript(
                     )
                 }
                 item("end") { Spacer(Modifier.height(1.dp)) }
+            }
             }
             JumpToLatest(
                 !following,

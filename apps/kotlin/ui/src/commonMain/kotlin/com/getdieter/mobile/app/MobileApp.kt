@@ -124,7 +124,8 @@ private fun MaterialShell(store: MobileStore, openUrl: (String) -> Unit) {
             snackbar,
             Modifier.align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(bottom = if (!rail && !immersive) 80.dp else 16.dp),
+                .padding(bottom = if (!rail && !immersive) 80.dp else 16.dp)
+                .floating(),
         )
         val modal = navigation.modal
         AnimatedVisibility(
@@ -133,6 +134,7 @@ private fun MaterialShell(store: MobileStore, openUrl: (String) -> Unit) {
             exit = slideOutVertically { it / 8 } + fadeOut(tween(180)),
         ) {
             val shown = remember(modal) { modal } ?: return@AnimatedVisibility
+            CoversWindow()
             CompositionLocalProvider(
                 LocalScreenInsets provides WindowInsets.safeDrawing.exclude(WindowInsets.ime)
             ) {

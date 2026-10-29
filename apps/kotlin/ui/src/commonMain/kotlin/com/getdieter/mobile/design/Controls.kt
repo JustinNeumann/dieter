@@ -506,6 +506,7 @@ internal fun PickerRow(
     var choosing by remember { mutableStateOf(false) }
     val nativeMenu = apple
     if (choosing && !nativeMenu) {
+        CoversWindow()
         AlertDialog(
             onDismissRequest = { choosing = false },
             title = { Text(title) },

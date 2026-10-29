@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -18,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -149,6 +152,7 @@ internal fun SubagentCard(agent: Subagent, expandedByDefault: Boolean = false) {
             Text(metrics.joinToString(" · "), style = type.footnote, color = palette.secondaryLabel)
         }
         AnimatedVisibility(expanded) {
+            SelectionContainer {
             Column(
                 Modifier.padding(top = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -166,6 +170,7 @@ internal fun SubagentCard(agent: Subagent, expandedByDefault: Boolean = false) {
                         color = palette.label,
                     )
                 }
+            }
             }
         }
     }
@@ -201,10 +206,17 @@ internal fun TaskPlanCard(plan: com.getdieter.api.v1.TaskPlan, modifier: Modifie
                 )
             phase.tasks.forEach { task ->
                 val done = TaskPlans.finished(task)
-                Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
+                // One item per task, its state read after its text; the icons alone would name
+                // the whole card ("Done, Done, Open").
+                Row(
+                    Modifier.padding(vertical = 4.dp).semantics(mergeDescendants = true) {
+                        stateDescription = if (done) "Done" else "Open"
+                    },
+                    verticalAlignment = Alignment.Top,
+                ) {
                     Icon(
                         if (done) Glyph.CHECK_CIRCLE else Glyph.CIRCLE,
-                        if (done) "Done" else "Open",
+                        null,
                         Modifier.padding(top = 1.dp),
                         tint = if (done) palette.success else palette.tertiaryLabel,
                         size = 18.dp,

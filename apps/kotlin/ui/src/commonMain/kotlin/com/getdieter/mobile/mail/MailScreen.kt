@@ -342,6 +342,7 @@ internal fun MailScreen(store: MobileStore) {
                 snackbar,
                 Modifier.align(Alignment.BottomCenter)
                     .padding(bottom = padding.calculateBottomPadding())
+                    .floating()
                     .testTag("mail-snackbar"),
             )
         }

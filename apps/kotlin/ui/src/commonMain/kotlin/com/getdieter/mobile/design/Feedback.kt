@@ -268,7 +268,7 @@ internal fun MetaPill(
             .clip(RoundedCornerShape(if (apple) 7.dp else 8.dp))
             .background(container)
             .padding(horizontal = 7.dp, vertical = 3.dp)
-            .semantics(mergeDescendants = true) { contentDescription = accessibility },
+            .readAs(accessibility),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -341,7 +341,7 @@ internal fun CountBadge(
 internal fun ProjectAvatar(id: String, name: String, size: Dp = 36.dp) {
     val tint = labelColor(com.getdieter.core.admin.Labels.stable(id))
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(size * .28f)).background(tint),
+        Modifier.size(size).clip(RoundedCornerShape(size * .28f)).background(tint).decorative(),
         contentAlignment = Alignment.Center,
     ) {
         Text(

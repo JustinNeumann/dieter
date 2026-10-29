@@ -18,8 +18,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -120,14 +118,9 @@ internal fun WorkCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                     if (age.isNotEmpty())
-                        Text(
-                            age,
-                            Modifier.padding(start = 10.dp, top = 2.dp).semantics {
-                                contentDescription = "Last activity $age"
-                            },
-                            style = type.footnote,
-                            color = palette.secondaryLabel,
-                        )
+                        Box(Modifier.padding(start = 10.dp, top = 2.dp).readAs("Last activity $age")) {
+                            Text(age, style = type.footnote, color = palette.secondaryLabel)
+                        }
                 }
                 if (card.summary.isNotBlank())
                     Text(
@@ -182,27 +175,25 @@ internal fun WorkCard(
                                 maxLines = 1,
                             )
                         }
-                    Text(
-                        listOfNotNull(
-                                Cards.agent(card),
-                                card.token_usage
-                                    ?.let(::TokenUsagePresentation)
-                                    ?.takeIf { it.reported }
-                                    ?.label(),
+                    val usage = card.token_usage?.let(::TokenUsagePresentation)?.takeIf { it.reported }
+                    val agentLine =
+                        listOfNotNull(Cards.agent(card), usage?.label()).joinToString(" · ")
+                    Box(
+                        if (usage == null) Modifier
+                        else
+                            Modifier.readAs(
+                                listOfNotNull(Cards.agent(card), TokenCounts.detail(usage.usage))
+                                    .joinToString(", ")
                             )
-                            .joinToString(" · "),
-                        style = type.footnote,
-                        color = palette.secondaryLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier =
-                            Modifier.semantics {
-                                card.token_usage
-                                    ?.let(::TokenUsagePresentation)
-                                    ?.takeIf { it.reported }
-                                    ?.let { contentDescription = TokenCounts.detail(it.usage) }
-                            },
-                    )
+                    ) {
+                        Text(
+                            agentLine,
+                            style = type.footnote,
+                            color = palette.secondaryLabel,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
                 if (
                     flags?.can_start == true ||

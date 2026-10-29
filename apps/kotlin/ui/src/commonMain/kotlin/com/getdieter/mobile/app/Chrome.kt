@@ -463,6 +463,7 @@ internal fun MaterialMenu(sections: List<MenuSection>, expanded: Boolean, onDism
             nested = null
             onDismiss()
         },
+        Modifier.floating(),
         shape = MaterialTheme.shapes.large,
         containerColor = colors.surfaceContainer,
     ) {

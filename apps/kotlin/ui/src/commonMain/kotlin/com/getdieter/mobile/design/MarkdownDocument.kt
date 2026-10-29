@@ -131,7 +131,9 @@ private fun rememberMarkdownStyle(linkKey: Any?, diagrams: Boolean = false): Mar
 }
 
 /**
- * [blocks] as lazy items, one per top-level block, so a long body composes only what shows.
+ * [blocks] as lazy items, one per top-level block, so a long body composes only what shows. Each
+ * block is selectable on its own unless the list sits in one [SelectionContainer] ([selectable]
+ * false), which lets a selection span blocks.
  * [linkKey] must change when [linkable] starts answering differently, e.g. once a workspace path is
  * known.
  */
@@ -143,6 +145,7 @@ internal fun LazyListScope.markdownDocument(
     key: String = "markdown",
     horizontalPadding: Dp = ScreenMargin + 4.dp,
     diagrams: Boolean = false,
+    selectable: Boolean = true,
 ) {
     itemsIndexed(
         blocks,
@@ -156,7 +159,8 @@ internal fun LazyListScope.markdownDocument(
                 .padding(horizontal = horizontalPadding)
                 .padding(top = if (index == 0) 0.dp else spacingBefore(block))
         ) {
-            SelectionContainer { BlockView(block, style, links, depth = 0) }
+            if (selectable) SelectionContainer { BlockView(block, style, links, depth = 0) }
+            else BlockView(block, style, links, depth = 0)
         }
     }
 }
@@ -244,10 +248,13 @@ private fun rememberInlines(
     inlines: List<MarkdownInline>,
     style: MarkdownStyle,
     links: MarkdownLinks,
-): AnnotatedString =
-    remember(inlines, style, links) {
-        buildAnnotatedString { appendInlines(inlines, style, links) }
+): AnnotatedString {
+    val query = LocalFindQuery.current
+    val highlight = findHighlight()
+    return remember(inlines, style, links, query, highlight) {
+        buildAnnotatedString { appendInlines(inlines, style, links) }.highlighting(query, highlight)
     }
+}
 
 private fun AnnotatedString.Builder.appendInlines(
     inlines: List<MarkdownInline>,
@@ -314,8 +321,10 @@ private fun AnnotatedString.Builder.link(
 
 @Composable
 private fun CodeView(block: MarkdownBlock.Code, style: MarkdownStyle) {
+    val query = LocalFindQuery.current
+    val found = findHighlight()
     val highlighted =
-        remember(block, style) {
+        remember(block, style, query, found) {
             val language = Markdown.codeLanguage(block.language)
             buildAnnotatedString {
                 append(block.text)
@@ -325,6 +334,7 @@ private fun CodeView(block: MarkdownBlock.Code, style: MarkdownStyle) {
                         addStyle(syntaxStyle(range.kind, style.dark), range.start, end)
                 }
             }
+                .highlighting(query, found)
         }
     val shape = RoundedCornerShape(12.dp)
     Column(
@@ -490,17 +500,21 @@ private fun Checkbox(checked: Boolean, style: MarkdownStyle) {
 private fun TableView(block: MarkdownBlock.Table, style: MarkdownStyle, links: MarkdownLinks) {
     var all by remember(block) { mutableStateOf(false) }
     val rows = if (all || block.rows.size <= TABLE_ROWS) block.rows else block.rows.take(TABLE_ROWS)
+    val query = LocalFindQuery.current
+    val found = findHighlight()
     val header =
-        remember(block, style, links) {
+        remember(block, style, links, query, found) {
             block.header.map { cell ->
                 buildAnnotatedString { appendInlines(Markdown.inline(cell), style, links) }
+                    .highlighting(query, found)
             }
         }
     val body =
-        remember(rows, style, links) {
+        remember(rows, style, links, query, found) {
             rows.map { row ->
                 row.map { cell ->
                     buildAnnotatedString { appendInlines(Markdown.inline(cell), style, links) }
+                        .highlighting(query, found)
                 }
             }
         }
