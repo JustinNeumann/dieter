@@ -103,15 +103,16 @@ func TestEmbeddedRuntimeContainsLocalModuleClosure(t *testing.T) {
 }
 
 func TestCatalogIncludesEverySupportedHarness(t *testing.T) {
-	if got := len(StaticCatalog(false).Adapters()); got != 5 {
-		t.Fatalf("catalog has %d harnesses, want 5", got)
+	if got := len(StaticCatalog(false).Adapters()); got != 6 {
+		t.Fatalf("catalog has %d harnesses, want 6", got)
 	}
-	for _, id := range []string{"codex", "claude-code", "pi", "omp", "dsh"} {
+	for _, id := range []string{"codex", "claude-code", "pi", "omp", "dsh", "antigravity"} {
 		adapter, found := StaticCatalog(false).ResolveAdapter(id)
 		if !found || adapter.DefaultModel == "" || len(adapter.Models) == 0 {
 			t.Errorf("harness %q is incomplete: %#v", id, adapter)
 		}
-		if !hasCapability(adapter, "task-plan") {
+		// Antigravity (agy) runs one headless turn at a time and has no task-plan channel.
+		if id != "antigravity" && !hasCapability(adapter, "task-plan") {
 			t.Errorf("harness %q does not advertise task plans: %#v", id, adapter.Capabilities)
 		}
 	}
