@@ -6,7 +6,15 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
-## Fork: server release v0.6.429-antigravity.5 (unreleased)
+## Fork: server release v0.6.431-antigravity.6 (2026-10-29)
+
+- Synced with upstream Dieter 0.6.431 (Mail chart rendering, table layout and Android scrolling, #171 and
+  #172). The Antigravity harness, the question relay and the store fixes of antigravity.1 to .5 are carried
+  over unchanged.
+- CI of the fork: the harness catalog test counts the sixth harness (Antigravity), which made the `go` job
+  fail on every run of the branch, and CI now also runs on pushes to `fork-release`.
+
+## Fork: server release v0.6.429-antigravity.5 (2026-10-29)
 
 - Board state is several times faster to rebuild. `dieter status`, `dieter project list` and every client that
   asks for the state of all projects rebuild it after each metadata change, which running agents cause
