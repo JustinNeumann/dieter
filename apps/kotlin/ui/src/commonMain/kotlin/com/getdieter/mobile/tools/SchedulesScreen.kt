@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.getdieter.api.v1.ScheduleDraft
 import com.getdieter.client.v1.*
+import com.getdieter.core.presentation.Ages
+import com.getdieter.core.runtime.Timestamps
 import com.getdieter.core.schedules.Cadence
 import com.getdieter.core.schedules.CadenceKind
 import com.getdieter.core.schedules.ScheduleDrafts
@@ -28,6 +30,8 @@ import com.getdieter.mobile.creation.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.store.*
+import kotlin.time.Clock
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun SchedulesScreen(store: MobileStore) {
@@ -38,6 +42,9 @@ internal fun SchedulesScreen(store: MobileStore) {
     fun command(value: SchedulesCommand) =
         store.command(Command(schedules = value.copy(scope = MobileStore.SCHEDULES_SCOPE)))
     fun rebind() = store.schedules.load(store.boards.currentProjectId())
+    val scope = rememberCoroutineScope()
+    val now = remember(view.run_rows) { Clock.System.now() }
+    fun runAge(at: String) = Timestamps.parse(at)?.let { Ages.ago(it, now) } ?: at
     val project = workspace.projects.firstOrNull { it.id == store.boards.currentProjectId() }
     Screen(
         ScreenChrome(
@@ -74,11 +81,67 @@ internal fun SchedulesScreen(store: MobileStore) {
                 ),
         )
     ) {
+        fun scrollTo(key: String) {
+            val index = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }?.index
+            if (index != null) scope.launch { listState.animateScrollToItem(index) }
+        }
         LazyColumn(
             Modifier.fillMaxSize().testTag("schedules-list"),
             state = listState,
             contentPadding = padding,
         ) {
+            // A schedule's runs open right under it (Run history in its menu), newest first.
+            fun runHistory() {
+                item(key = "history-${view.selected_id}") {
+                    SectionHeader(
+                        "Run history",
+                        trailing = {
+                            DButton(
+                                "Hide",
+                                { command(SchedulesCommand(select = ScheduleId(""))) },
+                                kind = ButtonKind.PLAIN,
+                            )
+                        },
+                    )
+                }
+                if (view.runs_loading && view.run_rows.isEmpty())
+                    item {
+                        Box(
+                            Modifier.fillMaxWidth().padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Spinner()
+                        }
+                    }
+                else if (view.run_rows.isEmpty())
+                    item { SectionFooter("This schedule has not run yet.") }
+                itemsIndexed(view.run_rows, key = { _, run -> "run-${run.id}" }) { index, run ->
+                    ListRow(
+                        run.status,
+                        position = Position.of(index, view.run_rows.size),
+                        subtitle =
+                            listOf(runAge(run.at), run.trigger, run.message)
+                                .filter { it.isNotEmpty() }
+                                .joinToString(" · "),
+                        accessory =
+                            if (run.card_id.isNotEmpty()) Accessory.CHEVRON else Accessory.NONE,
+                        onClick =
+                            if (run.card_id.isNotEmpty()) ({ store.openConversation(run.card_id) })
+                            else null,
+                        subtitleMaxLines = 3,
+                    )
+                }
+                if (view.runs_next_page_token.isNotEmpty())
+                    item(key = "older-runs") {
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            DButton(
+                                "Load older runs",
+                                { command(SchedulesCommand(load_more_runs = Step())) },
+                                kind = ButtonKind.PLAIN,
+                            )
+                        }
+                    }
+            }
             if (view.error.isNotEmpty())
                 item {
                     Banner(
@@ -133,98 +196,106 @@ internal fun SchedulesScreen(store: MobileStore) {
                             Modifier.testTag("schedules-project-${group.projectId}"),
                         )
                     }
-                itemsIndexed(group.schedules, key = { _, schedule -> schedule.id }) { _, schedule ->
-                    val row = view.rows.firstOrNull { it.id == schedule.id }
-                    val menu = rememberMenuState()
-                    val sections =
-                        listOf(
-                            MenuSection(
-                                listOf(
-                                    ChromeAction("run-${schedule.id}", "Run now", Glyph.PLAY) {
-                                        command(SchedulesCommand(run_now = ScheduleId(schedule.id)))
-                                    },
-                                    ChromeAction(
-                                        "history-${schedule.id}",
-                                        "Run history",
-                                        Glyph.HISTORY,
-                                    ) {
-                                        command(SchedulesCommand(select = ScheduleId(schedule.id)))
-                                    },
-                                    ChromeAction("edit-${schedule.id}", "Edit…", Glyph.EDIT) {
-                                        editorId = schedule.id
-                                    },
-                                )
-                            ),
-                            MenuSection(
-                                listOf(
-                                    ChromeAction(
-                                        "delete-${schedule.id}",
-                                        "Delete",
-                                        Glyph.TRASH,
-                                        destructive = true,
-                                    ) {
-                                        deleteId = schedule.id
+                for (schedule in group.schedules) {
+                    item(key = schedule.id) {
+                        val row = view.rows.firstOrNull { it.id == schedule.id }
+                        val open = schedule.id == view.selected_id
+                        val menu = rememberMenuState()
+                        val sections =
+                            listOf(
+                                MenuSection(
+                                    listOf(
+                                        ChromeAction("run-${schedule.id}", "Run now", Glyph.PLAY) {
+                                            command(
+                                                SchedulesCommand(run_now = ScheduleId(schedule.id))
+                                            )
+                                        },
+                                        ChromeAction(
+                                            "history-${schedule.id}",
+                                            if (open) "Hide run history" else "Run history",
+                                            Glyph.HISTORY,
+                                        ) {
+                                            val selected = if (open) "" else schedule.id
+                                            command(SchedulesCommand(select = ScheduleId(selected)))
+                                            if (!open) scrollTo(schedule.id)
+                                        },
+                                        ChromeAction("edit-${schedule.id}", "Edit…", Glyph.EDIT) {
+                                            editorId = schedule.id
+                                        },
+                                    )
+                                ),
+                                MenuSection(
+                                    listOf(
+                                        ChromeAction(
+                                            "delete-${schedule.id}",
+                                            "Delete",
+                                            Glyph.TRASH,
+                                            destructive = true,
+                                        ) {
+                                            deleteId = schedule.id
+                                        }
+                                    )
+                                ),
+                            )
+                        MenuAnchor(menu) {
+                            ContentCard(
+                                Modifier.padding(horizontal = ScreenMargin, vertical = 5.dp)
+                                    .testTag("schedule-${schedule.id}"),
+                                onClick = { editorId = schedule.id },
+                                onLongClick = { menu.show(sections) },
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            schedule.name,
+                                            style = type.headline,
+                                            color = palette.label,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        Text(
+                                            row?.timing.orEmpty(),
+                                            style = type.subheadline,
+                                            color = palette.secondaryLabel,
+                                        )
                                     }
-                                )
-                            ),
-                        )
-                    MenuAnchor(menu) {
-                        ContentCard(
-                            Modifier.padding(horizontal = ScreenMargin, vertical = 5.dp)
-                                .testTag("schedule-${schedule.id}"),
-                            onClick = { editorId = schedule.id },
-                            onLongClick = { menu.show(sections) },
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
+                                    DSwitch(
+                                        schedule.enabled,
+                                        {
+                                            command(
+                                                SchedulesCommand(
+                                                    set_enabled = ScheduleEnabled(schedule.id, it)
+                                                )
+                                            )
+                                        },
+                                    )
+                                }
+                                if (!row?.subtitle.isNullOrEmpty()) {
+                                    Spacer(Modifier.height(6.dp))
                                     Text(
-                                        schedule.name,
-                                        style = type.headline,
+                                        row.subtitle,
+                                        style = type.subheadline,
                                         color = palette.label,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        row?.timing.orEmpty(),
-                                        style = type.subheadline,
+                                        listOf(row?.placement.orEmpty(), row?.status.orEmpty())
+                                            .filter { it.isNotEmpty() }
+                                            .joinToString(" · "),
+                                        Modifier.weight(1f),
+                                        style = type.footnote,
                                         color = palette.secondaryLabel,
                                     )
+                                    MenuButton(sections, "Schedule actions")
                                 }
-                                DSwitch(
-                                    schedule.enabled,
-                                    {
-                                        command(
-                                            SchedulesCommand(
-                                                set_enabled = ScheduleEnabled(schedule.id, it)
-                                            )
-                                        )
-                                    },
-                                )
-                            }
-                            if (!row?.subtitle.isNullOrEmpty()) {
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    row.subtitle,
-                                    style = type.subheadline,
-                                    color = palette.label,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    listOf(row?.placement.orEmpty(), row?.status.orEmpty())
-                                        .filter { it.isNotEmpty() }
-                                        .joinToString(" · "),
-                                    Modifier.weight(1f),
-                                    style = type.footnote,
-                                    color = palette.secondaryLabel,
-                                )
-                                MenuButton(sections, "Schedule actions")
                             }
                         }
                     }
+                    if (schedule.id == view.selected_id) runHistory()
                 }
             }
 
@@ -238,57 +309,6 @@ internal fun SchedulesScreen(store: MobileStore) {
                         )
                     }
                 }
-            if (view.selected_id.isNotEmpty()) {
-                item {
-                    SectionHeader(
-                        "Run history",
-                        trailing = {
-                            DButton(
-                                "Hide",
-                                { command(SchedulesCommand(select = ScheduleId(""))) },
-                                kind = ButtonKind.PLAIN,
-                            )
-                        },
-                    )
-                }
-                if (view.runs_loading && view.run_rows.isEmpty())
-                    item {
-                        Box(
-                            Modifier.fillMaxWidth().padding(24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Spinner()
-                        }
-                    }
-                else if (view.run_rows.isEmpty())
-                    item { SectionFooter("This schedule has not run yet.") }
-                itemsIndexed(view.run_rows, key = { _, run -> run.id }) { index, run ->
-                    ListRow(
-                        run.status,
-                        position = Position.of(index, view.run_rows.size),
-                        subtitle =
-                            listOf(run.at, run.trigger, run.message)
-                                .filter { it.isNotEmpty() }
-                                .joinToString(" · "),
-                        accessory =
-                            if (run.card_id.isNotEmpty()) Accessory.CHEVRON else Accessory.NONE,
-                        onClick =
-                            if (run.card_id.isNotEmpty()) ({ store.openConversation(run.card_id) })
-                            else null,
-                        subtitleMaxLines = 3,
-                    )
-                }
-                if (view.runs_next_page_token.isNotEmpty())
-                    item {
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            DButton(
-                                "Load older runs",
-                                { command(SchedulesCommand(load_more_runs = Step())) },
-                                kind = ButtonKind.PLAIN,
-                            )
-                        }
-                    }
-            }
         }
     }
     editorId?.let { id ->

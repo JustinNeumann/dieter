@@ -1,5 +1,8 @@
 package com.getdieter.mobile.store
 
+import com.getdieter.client.v1.Command
+import com.getdieter.client.v1.ScheduleId
+import com.getdieter.client.v1.SchedulesCommand
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.settings.DieterPalette
 import kotlinx.coroutines.delay
@@ -8,7 +11,8 @@ import kotlinx.coroutines.flow.first
 /**
  * Debug builds only: replays navigation steps so screenshots of any screen can be taken without
  * touch automation. Steps are separated by ";", e.g. "tab projects; board Main; card Design; pane
- * subagents", "channel Pricing" or "tab mail; mail Dependency audit".
+ * subagents", "channel Pricing", "tab mail; mail Dependency audit" or "tab tools; tool schedules; runs
+ * Backup" (a schedule's run history).
  */
 internal suspend fun MobileStore.runDebugScript(script: String) {
     workspace.slice.first { it.loaded }
@@ -67,6 +71,22 @@ internal suspend fun MobileStore.runDebugScript(script: String) {
                         it.display_name.startsWith(argument, true) || argument.isEmpty()
                     }
                     ?.let { push(MobileRoute.Machine(it.id)) }
+            "runs" ->
+                schedules.slice
+                    .first { it.loaded }
+                    .schedules
+                    .firstOrNull { it.name.startsWith(argument, true) }
+                    ?.let {
+                        command(
+                            Command(
+                                schedules =
+                                    SchedulesCommand(
+                                        select = ScheduleId(it.id),
+                                        scope = MobileStore.SCHEDULES_SCOPE,
+                                    )
+                            )
+                        )
+                    }
             "terminal" -> push(MobileRoute.Tool(ToolPage.TERMINALS))
             "new" -> newConversation(chat = false)
             "newchat" -> newConversation(chat = true)
