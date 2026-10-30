@@ -2,6 +2,7 @@ package kanban
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -118,6 +119,20 @@ func (s *Store) GetBoard(id string) (model.Board, error) {
 		}
 	}
 	return model.Board{}, fmt.Errorf("board %q: %w", id, home.ErrNotFound)
+}
+
+// ResolveArchiveBoard resolves a board whose archived cards are read: an active
+// board as ResolveBoard does, or a retired one by its exact ID, since archived
+// cards stay with a retired board (fork). Mutations keep using ResolveBoard.
+func (s *Store) ResolveArchiveBoard(projectID, ref string) (model.Board, error) {
+	board, err := s.ResolveBoard(projectID, ref)
+	if !errors.Is(err, home.ErrNotFound) {
+		return board, err
+	}
+	if retired, getErr := s.GetBoard(ref); getErr == nil && retired.Retired && (projectID == "" || retired.ProjectID == projectID) {
+		return retired, nil
+	}
+	return board, err
 }
 
 type RetiredBoardPage struct {

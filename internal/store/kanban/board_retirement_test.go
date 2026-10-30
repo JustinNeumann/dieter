@@ -103,9 +103,19 @@ func TestBoardRetirementKeepsArchivedCardsAndRefusesLiveOrIncompleteReferences(t
 	if _, err = s.Kanban.ResolveBoard(p.ID, b.ID); !errors.Is(err, home.ErrNotFound) {
 		t.Fatalf("retired active resolution: %v", err)
 	}
-	cards, err := s.Kanban.ListCards(kanban.CardFilter{Project: p.ID, IncludeArchived: true})
+	cards, err := s.Kanban.ListCards(kanban.CardFilter{Project: p.ID, Board: b.ID, IncludeArchived: true})
 	if err != nil || len(cards) != 1 || cards[0].ID != card.ID || cards[0].BoardID != b.ID || !cards[0].Archived {
 		t.Fatalf("archived card: %+v %v", cards, err)
+	}
+	if detail, err := s.Kanban.ReadCardDetail(card.ID); err != nil || detail.Board.ID != b.ID || !detail.Board.Retired {
+		t.Fatalf("archived card detail: %+v %v", detail, err)
+	}
+	// turns and other mutations still see no board
+	if _, err := s.Kanban.CardDetail(card.ID); !errors.Is(err, home.ErrNotFound) {
+		t.Fatalf("mutation reached the retired board: %v", err)
+	}
+	if _, err := s.Kanban.ListCards(kanban.CardFilter{Project: p.ID, Board: b.ID}); !errors.Is(err, home.ErrNotFound) {
+		t.Fatalf("active listing of a retired board: %v", err)
 	}
 	// unarchiving it makes the card live again, which keeps the board accessible
 	if _, err := s.Kanban.ArchiveCard(card.ID, false); err != nil {

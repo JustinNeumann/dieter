@@ -6,6 +6,13 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
+## Fork: server release v0.6.431-antigravity.8 (2026-10-30)
+
+- The archived cards of a retired board stay readable: the clients' archived-card list, a card's detail and its
+  conversation resolve a retired board by its exact ID (`ResolveArchiveBoard`, `ReadCardDetail`). In
+  antigravity.7 they answered "board not found" until the board was restored. Turns and other mutations still
+  see no retired board. `dieter board retire --help` no longer says archived cards keep a board.
+
 ## Fork: server release v0.6.431-antigravity.7 (2026-10-30)
 
 - A board whose cards are all archived can be retired. Upstream keeps any board that an archived card still

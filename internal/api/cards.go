@@ -15,7 +15,7 @@ import (
 )
 
 func (api *cardsAPI) ListArchivedCards(_ context.Context, request *dieterv1.BoardRef) (*dieterv1.CardsResponse, error) {
-	board, err := api.server.store.Kanban.ResolveBoard("", request.GetBoardId())
+	board, err := api.server.store.Kanban.ResolveArchiveBoard("", request.GetBoardId())
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (api *cardsAPI) ListChats(_ context.Context, request *dieterv1.ListChatsReq
 }
 
 func (api *cardsAPI) GetCard(_ context.Context, request *dieterv1.GetCardRequest) (*dieterv1.CardDetail, error) {
-	value, err := api.server.store.Kanban.CardDetail(request.GetCardId())
+	value, err := api.server.store.Kanban.ReadCardDetail(request.GetCardId())
 	if err != nil {
 		return nil, err
 	}

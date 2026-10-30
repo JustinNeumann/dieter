@@ -13,7 +13,7 @@ func (c *CLI) rpcBoardRetirement(args []string, retired bool) error {
 	if retired {
 		action = "retire"
 	}
-	usage := "Usage: dieter board " + action + " --revision REV --operation ID BOARD\n\nUse an exact board ID and its retirementRevision from board show. Retirement refuses active, archived, pending card or schedule references. Records and labels are retained; restore is reversible. A late peer reference makes retirement blocked and the board visible.\nThe operation ID is a durable local replay receipt: retry identical input only on the same daemon. Success means local durability, not acknowledgement by every replica.\n"
+	usage := "Usage: dieter board " + action + " --revision REV --operation ID BOARD\n\nUse an exact board ID and its retirementRevision from board show. Retirement refuses active or pending card and schedule references; archived cards stay with the board. Records and labels are retained; restore is reversible. A late peer reference makes retirement blocked and the board visible.\nThe operation ID is a durable local replay receipt: retry identical input only on the same daemon. Success means local durability, not acknowledgement by every replica.\n"
 	set := flags("board " + action)
 	revision := set.String("revision", "", "observed retirementRevision")
 	operation := set.String("operation", "", "stable operation ID for replay on this daemon")
