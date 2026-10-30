@@ -141,15 +141,20 @@ object AdminForms {
 
 data class LabelColor(val name: String, val value: String)
 
-/** Retiring (archiving) a board: the daemon keeps any board that still has cards or schedules. */
+/**
+ * Retiring (archiving) a board: the daemon keeps any board that still has open cards or schedules. Archived
+ * cards stay with the retired board (the add-on's daemon; upstream Dieter keeps a board with archived cards too).
+ */
 object BoardRetirement {
     /** Why the daemon kept a board it was asked to retire, in the person's words; null for other failures. */
     fun refusal(message: String): String? =
         when {
             "surviving card" in message ->
-                "Only an empty board can be archived: this one still has cards, archived cards included."
+                "Only a board without open cards can be archived: archive this one's cards first."
             "surviving schedule" in message ->
-                "Only an empty board can be archived: a schedule still belongs to this one."
+                "Only a board without schedules can be archived: a schedule still belongs to this one."
+            "surviving references" in message ->
+                "Cards or schedules another machine has not archived yet still belong to this board."
             else -> null
         }
 }

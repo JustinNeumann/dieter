@@ -141,7 +141,7 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
                         EmptyState(
                             Glyph.ARCHIVE,
                             "Board archived",
-                            "Dieter keeps this empty board and its settings.",
+                            "Dieter keeps this board, its settings and its archived cards.",
                             Modifier.padding(top = 48.dp),
                         ) {
                             DButton(
@@ -195,8 +195,8 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
     if (archiving)
         ConfirmDialog(
             "Archive “${board?.name ?: "Board"}”?",
-            "Only an empty board can be archived: no cards, archived cards included, and no schedules. Dieter " +
-                "keeps it and its settings; the project's page lists it to restore.",
+            "Its archived cards stay with it; a board with open cards or a schedule can't be archived. Dieter " +
+                "keeps it and its settings, and the project's page lists it to restore.",
             "Archive",
             {
                 store.command(Command(admin = AdminCommand(set_board_retired = AdminBoardRetired(boardId, true))))
