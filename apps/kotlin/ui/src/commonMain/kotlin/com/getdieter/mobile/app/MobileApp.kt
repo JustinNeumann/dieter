@@ -222,6 +222,21 @@ private fun NavigationRailBar(store: MobileStore, navigation: MobileNavigation) 
 }
 
 /** One tab's stack: single pane with shared-axis motion, or list beside detail when wide. */
+/**
+ * Whether [route] takes the whole width of a wide layout ([BoardRenderer.wide],
+ * [ExtensionPage.wide]).
+ */
+@Composable
+private fun wideRoute(store: MobileStore, route: MobileRoute): Boolean {
+    val extensions = LocalMobileExtensions.current
+    return when (route) {
+        is MobileRoute.Board ->
+            extensions.boardRenderer?.let { it.wide && it.claims(store, route.boardId) } == true
+        is MobileRoute.Extension -> extensions.page(route.id)?.wide?.invoke(route.arg) == true
+        else -> false
+    }
+}
+
 @Composable
 private fun TabStack(
     store: MobileStore,
@@ -232,7 +247,13 @@ private fun TabStack(
     val holder = rememberSaveableStateHolder()
     val stack = navigation.stack
     val listIndex = stack.indexOfLast { it.list }
-    if (twoPane && listIndex >= 0) {
+    // A host's page that wants the whole width (a Dreamfall board) shows the stack as on a phone.
+    val wide =
+        twoPane &&
+            stack.drop(maxOf(listIndex, 0)).any { route ->
+                key(route.key) { wideRoute(store, route) }
+            }
+    if (twoPane && listIndex >= 0 && !wide) {
         val list = stack[listIndex]
         val details = stack.drop(listIndex + 1)
         val detail = details.lastOrNull()

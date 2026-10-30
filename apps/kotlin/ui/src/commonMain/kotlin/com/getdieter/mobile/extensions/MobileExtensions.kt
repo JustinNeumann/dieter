@@ -13,9 +13,11 @@ import com.getdieter.mobile.store.MobileStore
  * What a host app adds to the shared screens: its own pages, sections on built-in tool pages, rows
  * at the top of the Inbox, widgets in a conversation, Projects menu actions and its own view for
  * some boards. The Home Assistant add-on uses them for features only it has (agent questions,
- * Dreamfall, Claude sign-in, gateway enrollment, ...). Apps without extensions get the empty default.
+ * Dreamfall, Claude sign-in, gateway enrollment, ...). Apps without extensions get the empty
+ * default.
  *
- * Pages open as [com.getdieter.mobile.navigation.MobileRoute.Extension] with the page's [ExtensionPage.id].
+ * Pages open as [com.getdieter.mobile.navigation.MobileRoute.Extension] with the page's
+ * [ExtensionPage.id].
  */
 @Immutable
 internal class MobileExtensions(
@@ -31,11 +33,17 @@ internal class MobileExtensions(
     val projectActions: List<ExtensionAction> = emptyList(),
     /** A board view of the host's own for the boards it claims (e.g. a Dreamfall stage). */
     val boardRenderer: BoardRenderer? = null,
-    /** The host's namer for new tasks and chats sent without a title, while the New task form is open. */
+    /**
+     * The host's namer for new tasks and chats sent without a title, while the New task form is
+     * open.
+     */
     val conversationNamer: @Composable (MobileStore) -> ConversationNamer? = { null },
     /** A board order of the host's own; without one, boards keep Dieter's order. */
     val boardOrder: @Composable (MobileStore) -> BoardOrder? = { null },
-    /** Boards the host lists in Projects as one row of its own (e.g. a Dreamfall board's stage boards). */
+    /**
+     * Boards the host lists in Projects as one row of its own (e.g. a Dreamfall board's stage
+     * boards).
+     */
     val boardGroups: @Composable (MobileStore) -> List<BoardGroup> = { emptyList() },
     /** Quotas the host reads itself, as more bars in the Inbox's usage strip. */
     val usageBars: @Composable (MobileStore) -> List<UsageBar> = { emptyList() },
@@ -60,6 +68,11 @@ internal class ExtensionPage(
     val section: ToolSection? = null,
     /** A short value at the end of its Tools row, e.g. "2 open". */
     val value: @Composable (MobileStore) -> String? = { null },
+    /**
+     * Whether the page for [arg] takes the whole width of a wide layout (e.g. a Dreamfall board)
+     * instead of opening beside the list.
+     */
+    val wide: (arg: String) -> Boolean = { false },
     /** The page; [arg] is the route's argument (a board ID, an idea ID, ...). */
     val content: @Composable (store: MobileStore, arg: String) -> Unit,
 )
@@ -89,11 +102,13 @@ internal class BoardRenderer(
     /** Whether the host draws [boardId] itself; may change as its data loads. */
     val claims: @Composable (store: MobileStore, boardId: String) -> Boolean,
     val content: @Composable (store: MobileStore, boardId: String) -> Unit,
+    /** Claimed boards take the whole width of a wide layout instead of the list pane. */
+    val wide: Boolean = false,
 )
 
 /**
- * A board order the host keeps (the add-on: one order for all its devices). Projects shows boards in it, and a
- * board is dragged into place after a long press.
+ * A board order the host keeps (the add-on: one order for all its devices). Projects shows boards
+ * in it, and a board is dragged into place after a long press.
  */
 @Immutable
 internal class BoardOrder(
@@ -103,7 +118,9 @@ internal class BoardOrder(
     val move: (List<String>) -> Unit,
 )
 
-/** Boards in one row of the host's: it takes the place of the first of them and is dragged as one. */
+/**
+ * Boards in one row of the host's: it takes the place of the first of them and is dragged as one.
+ */
 @Immutable
 internal class BoardGroup(
     val boardIds: List<String>,
@@ -120,8 +137,7 @@ internal class BoardGroup(
 )
 
 /** A quota of the host's, drawn like a provider's in the Inbox: [remaining] percent left. */
-@Immutable
-internal class UsageBar(val name: String, val remaining: Int)
+@Immutable internal class UsageBar(val name: String, val remaining: Int)
 
 internal val LocalMobileExtensions = staticCompositionLocalOf { MobileExtensions() }
 
