@@ -93,9 +93,16 @@ class CreationCommandsTest {
                 title = "Audit",
                 vaultAccess = true,
                 mailAccess = true,
+                homeAssistantAccess = true,
             )
         val intent = creationIntent(input)
         assertTrue(intent.mail_access)
+        assertTrue(intent.home_assistant_access)
+        assertTrue(Creation.request(input).home_assistant_access)
+        assertFalse(
+            creationIntent(CreationInput(project = project)).home_assistant_access,
+            "off by default",
+        )
         assertTrue(intent.vault_access)
         assertTrue(Creation.request(input).mail_access)
         assertFalse(creationIntent(input.copy(mailAccess = false)).mail_access)

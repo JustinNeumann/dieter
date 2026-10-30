@@ -1234,9 +1234,13 @@ type Card struct {
 	VaultAccess bool `protobuf:"varint,47,opt,name=vault_access,json=vaultAccess,proto3" json:"vault_access,omitempty"`
 	// Owner-local: agent turns of this conversation may send the user mail.
 	// Set only at creation; forks and merges never inherit it.
-	MailAccess    bool `protobuf:"varint,48,opt,name=mail_access,json=mailAccess,proto3" json:"mail_access,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MailAccess bool `protobuf:"varint,48,opt,name=mail_access,json=mailAccess,proto3" json:"mail_access,omitempty"`
+	// Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+	// Owner-local: agent turns of this conversation may use Home Assistant.
+	// Set only at creation; forks and merges never inherit it.
+	HomeAssistantAccess bool `protobuf:"varint,1001,opt,name=home_assistant_access,json=homeAssistantAccess,proto3" json:"home_assistant_access,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *Card) Reset() {
@@ -1594,6 +1598,13 @@ func (x *Card) GetVaultAccess() bool {
 func (x *Card) GetMailAccess() bool {
 	if x != nil {
 		return x.MailAccess
+	}
+	return false
+}
+
+func (x *Card) GetHomeAssistantAccess() bool {
+	if x != nil {
+		return x.HomeAssistantAccess
 	}
 	return false
 }
@@ -5192,7 +5203,7 @@ const file_dieter_v1_common_proto_rawDesc = "" +
 	"\x0eCardStateField\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\brevision\x18\x02 \x01(\tR\brevision\x127\n" +
-	"\bversions\x18\x03 \x03(\v2\x1b.dieter.v1.CardStateVersionR\bversions\"\x8c\x0f\n" +
+	"\bversions\x18\x03 \x03(\v2\x1b.dieter.v1.CardStateVersionR\bversions\"\xc1\x0f\n" +
 	"\x04Card\x12<\n" +
 	"\fstate_fields\x18. \x03(\v2\x19.dieter.v1.CardStateFieldR\vstateFields\x12&\n" +
 	"\x0fowner_daemon_id\x18& \x01(\tR\rownerDaemonId\x12\x1f\n" +
@@ -5247,7 +5258,8 @@ const file_dieter_v1_common_proto_rawDesc = "" +
 	"\x14provider_account_key\x18% \x01(\tR\x12providerAccountKey\x12!\n" +
 	"\fvault_access\x18/ \x01(\bR\vvaultAccess\x12\x1f\n" +
 	"\vmail_access\x180 \x01(\bR\n" +
-	"mailAccess\x1aB\n" +
+	"mailAccess\x123\n" +
+	"\x15home_assistant_access\x18\xe9\a \x01(\bR\x13homeAssistantAccess\x1aB\n" +
 	"\x14ProviderOptionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x18\x10\x19\"\x8e\x01\n" +

@@ -704,6 +704,7 @@ class AccountProjector {
                 remote_publish_mode = owned.remote_publish_mode,
                 vault_access = owned.vault_access,
                 mail_access = owned.mail_access,
+                home_assistant_access = owned.home_assistant_access,
                 workspace = owned.workspace,
                 pull_request = owned.pull_request,
                 token_usage = owned.token_usage,

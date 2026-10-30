@@ -79,7 +79,7 @@ func commandTable() []command {
 			aliases:     []string{"cards"},
 			summary:     "Create, edit, read, present files, merge, and manage board conversations",
 			run:         func(c *CLI, args []string) error { return c.rpcCard(args, false) },
-			subcommands: []string{"present", "create", "list", "show", "context", "transcript", "poll", "watch", "tool-output", "fork", "send", "queue", "queue remove", "read", "merge", "move", "start", "labels", "cancel", "rename", "update", "archive", "unarchive", "workspace"},
+			subcommands: []string{"present", "create", "list", "show", "context", "transcript", "poll", "watch", "tool-output", "fork", "send", "queue", "queue remove", "read", "merge", "move", "start", "labels", "cancel", "rename", "update", "archive", "unarchive", "workspace", "caller"},
 		},
 		{
 			name:        "chat",

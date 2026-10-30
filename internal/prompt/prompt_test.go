@@ -109,7 +109,7 @@ func TestBindWorkspaceUpgradesPersistedInstructionsOnce(t *testing.T) {
 func TestDefaultInstructionsRunTheDaemonsCLI(t *testing.T) {
 	t.Parallel()
 	detail := promptDetail()
-	detail.Card.VaultAccess, detail.Card.MailAccess = true, true
+	detail.Card.VaultAccess, detail.Card.MailAccess, detail.Card.HomeAssistantAccess = true, true, true
 	workspace := model.Workspace{Mode: model.WorkspaceModeProject, Path: "/work/atlas"}
 	cli := CLIWord("/opt/homebrew/var/dieter/service/bin/dieter")
 	resolved, err := ResolveForWorkspace(NormalizeSettings(model.Settings{}), detail, detail.Card.LabelIDs, workspace, cli)
@@ -123,6 +123,7 @@ func TestDefaultInstructionsRunTheDaemonsCLI(t *testing.T) {
 		cli + " card move c_one --lane review",
 		cli + " card create --project p_one --board b_one --workspace project --title",
 		"Board labels: Android (android), Security (security).",
+		"## Home Assistant\nThis conversation may use Home Assistant: hass-cli",
 		cli + " card labels c_one --set",
 		cli + " vault exec ITEM --env NAME=password",
 		"## Mail to the user",
@@ -140,12 +141,13 @@ func TestDefaultInstructionsRunTheDaemonsCLI(t *testing.T) {
 		}
 	}
 	detail.Card.Scope, detail.Card.BoardID, detail.Card.VaultAccess, detail.Card.MailAccess = model.ConversationScopeChat, "", false, false
+	detail.Card.HomeAssistantAccess = false
 	chat, err := ResolveForWorkspace(NormalizeSettings(model.Settings{}), detail, nil, workspace, cli)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// A conversation without mail access never learns how to send mail.
-	for _, unexpected := range []string{"mail send", "Dieter Mail", "vault exec"} {
+	for _, unexpected := range []string{"mail send", "Dieter Mail", "vault exec", "hass-cli"} {
 		if strings.Contains(chat.Instructions, unexpected) {
 			t.Fatalf("instructions without access contain %q:\n%s", unexpected, chat.Instructions)
 		}

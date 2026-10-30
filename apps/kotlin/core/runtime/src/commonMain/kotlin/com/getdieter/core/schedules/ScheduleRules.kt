@@ -228,6 +228,7 @@ object ScheduleDrafts {
                     workspace_mode = it.workspace_mode,
                     vault_access = it.vault_access,
                     mail_access = it.mail_access,
+                    home_assistant_access = it.home_assistant_access,
                 )
             }
                 ?: ScheduleDraft(

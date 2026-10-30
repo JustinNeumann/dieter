@@ -32,6 +32,18 @@ service CardService {
   rpc UpdateCard(UpdateCardRequest) returns (Card);
   rpc ArchiveCard(ArchiveCardRequest) returns (Card);
   rpc PinChat(PinChatRequest) returns (Card);
+  // GetTurnCaller names the conversation of the agent turn whose token the
+  // call carries and what it may use; a call without a live turn token is
+  // refused. A host's services check an agent's token with it.
+  rpc GetTurnCaller(google.protobuf.Empty) returns (TurnCaller);
+}
+
+message TurnCaller {
+  string card_id = 1;
+  string project_id = 2;
+  bool vault_access = 3;
+  bool mail_access = 4;
+  bool home_assistant_access = 5;
 }
 
 message CardsResponse {
@@ -67,6 +79,10 @@ message CreateConversationRequest {
   // Let this conversation's agent turns send the user mail (MailService).
   // An agent turn may grant it only when its own conversation has it.
   bool mail_access = 26;
+  // Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  // Let this conversation's agent turns use Home Assistant (the add-on's hass-cli).
+  // An agent turn may grant it only when its own conversation has it.
+  bool home_assistant_access = 1001;
 }
 
 message ListChatsRequest {

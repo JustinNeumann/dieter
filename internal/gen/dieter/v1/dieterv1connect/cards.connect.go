@@ -66,6 +66,9 @@ const (
 	CardServiceArchiveCardProcedure = "/dieter.v1.CardService/ArchiveCard"
 	// CardServicePinChatProcedure is the fully-qualified name of the CardService's PinChat RPC.
 	CardServicePinChatProcedure = "/dieter.v1.CardService/PinChat"
+	// CardServiceGetTurnCallerProcedure is the fully-qualified name of the CardService's GetTurnCaller
+	// RPC.
+	CardServiceGetTurnCallerProcedure = "/dieter.v1.CardService/GetTurnCaller"
 )
 
 // CardServiceClient is a client for the dieter.v1.CardService service.
@@ -91,6 +94,10 @@ type CardServiceClient interface {
 	UpdateCard(context.Context, *v1.UpdateCardRequest) (*v1.Card, error)
 	ArchiveCard(context.Context, *v1.ArchiveCardRequest) (*v1.Card, error)
 	PinChat(context.Context, *v1.PinChatRequest) (*v1.Card, error)
+	// GetTurnCaller names the conversation of the agent turn whose token the
+	// call carries and what it may use; a call without a live turn token is
+	// refused. A host's services check an agent's token with it.
+	GetTurnCaller(context.Context, *emptypb.Empty) (*v1.TurnCaller, error)
 }
 
 // NewCardServiceClient constructs a client for the dieter.v1.CardService service. By default, it
@@ -194,6 +201,12 @@ func NewCardServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(cardServiceMethods.ByName("PinChat")),
 			connect.WithClientOptions(opts...),
 		),
+		getTurnCaller: connect.NewClient[emptypb.Empty, v1.TurnCaller](
+			httpClient,
+			baseURL+CardServiceGetTurnCallerProcedure,
+			connect.WithSchema(cardServiceMethods.ByName("GetTurnCaller")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -214,6 +227,7 @@ type cardServiceClient struct {
 	updateCard        *connect.Client[v1.UpdateCardRequest, v1.Card]
 	archiveCard       *connect.Client[v1.ArchiveCardRequest, v1.Card]
 	pinChat           *connect.Client[v1.PinChatRequest, v1.Card]
+	getTurnCaller     *connect.Client[emptypb.Empty, v1.TurnCaller]
 }
 
 // ListArchivedCards calls dieter.v1.CardService.ListArchivedCards.
@@ -351,6 +365,15 @@ func (c *cardServiceClient) PinChat(ctx context.Context, req *v1.PinChatRequest)
 	return nil, err
 }
 
+// GetTurnCaller calls dieter.v1.CardService.GetTurnCaller.
+func (c *cardServiceClient) GetTurnCaller(ctx context.Context, req *emptypb.Empty) (*v1.TurnCaller, error) {
+	response, err := c.getTurnCaller.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // CardServiceHandler is an implementation of the dieter.v1.CardService service.
 type CardServiceHandler interface {
 	ListArchivedCards(context.Context, *v1.BoardRef) (*v1.CardsResponse, error)
@@ -374,6 +397,10 @@ type CardServiceHandler interface {
 	UpdateCard(context.Context, *v1.UpdateCardRequest) (*v1.Card, error)
 	ArchiveCard(context.Context, *v1.ArchiveCardRequest) (*v1.Card, error)
 	PinChat(context.Context, *v1.PinChatRequest) (*v1.Card, error)
+	// GetTurnCaller names the conversation of the agent turn whose token the
+	// call carries and what it may use; a call without a live turn token is
+	// refused. A host's services check an agent's token with it.
+	GetTurnCaller(context.Context, *emptypb.Empty) (*v1.TurnCaller, error)
 }
 
 // NewCardServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -473,6 +500,12 @@ func NewCardServiceHandler(svc CardServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(cardServiceMethods.ByName("PinChat")),
 		connect.WithHandlerOptions(opts...),
 	)
+	cardServiceGetTurnCallerHandler := connect.NewUnaryHandlerSimple(
+		CardServiceGetTurnCallerProcedure,
+		svc.GetTurnCaller,
+		connect.WithSchema(cardServiceMethods.ByName("GetTurnCaller")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/dieter.v1.CardService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case CardServiceListArchivedCardsProcedure:
@@ -505,6 +538,8 @@ func NewCardServiceHandler(svc CardServiceHandler, opts ...connect.HandlerOption
 			cardServiceArchiveCardHandler.ServeHTTP(w, r)
 		case CardServicePinChatProcedure:
 			cardServicePinChatHandler.ServeHTTP(w, r)
+		case CardServiceGetTurnCallerProcedure:
+			cardServiceGetTurnCallerHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -572,4 +607,8 @@ func (UnimplementedCardServiceHandler) ArchiveCard(context.Context, *v1.ArchiveC
 
 func (UnimplementedCardServiceHandler) PinChat(context.Context, *v1.PinChatRequest) (*v1.Card, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dieter.v1.CardService.PinChat is not implemented"))
+}
+
+func (UnimplementedCardServiceHandler) GetTurnCaller(context.Context, *emptypb.Empty) (*v1.TurnCaller, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("dieter.v1.CardService.GetTurnCaller is not implemented"))
 }

@@ -35,6 +35,7 @@ const (
 	CardService_UpdateCard_FullMethodName        = "/dieter.v1.CardService/UpdateCard"
 	CardService_ArchiveCard_FullMethodName       = "/dieter.v1.CardService/ArchiveCard"
 	CardService_PinChat_FullMethodName           = "/dieter.v1.CardService/PinChat"
+	CardService_GetTurnCaller_FullMethodName     = "/dieter.v1.CardService/GetTurnCaller"
 )
 
 // CardServiceClient is the client API for CardService service.
@@ -64,6 +65,10 @@ type CardServiceClient interface {
 	UpdateCard(ctx context.Context, in *UpdateCardRequest, opts ...grpc.CallOption) (*Card, error)
 	ArchiveCard(ctx context.Context, in *ArchiveCardRequest, opts ...grpc.CallOption) (*Card, error)
 	PinChat(ctx context.Context, in *PinChatRequest, opts ...grpc.CallOption) (*Card, error)
+	// GetTurnCaller names the conversation of the agent turn whose token the
+	// call carries and what it may use; a call without a live turn token is
+	// refused. A host's services check an agent's token with it.
+	GetTurnCaller(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TurnCaller, error)
 }
 
 type cardServiceClient struct {
@@ -224,6 +229,16 @@ func (c *cardServiceClient) PinChat(ctx context.Context, in *PinChatRequest, opt
 	return out, nil
 }
 
+func (c *cardServiceClient) GetTurnCaller(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*TurnCaller, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TurnCaller)
+	err := c.cc.Invoke(ctx, CardService_GetTurnCaller_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CardServiceServer is the server API for CardService service.
 // All implementations must embed UnimplementedCardServiceServer
 // for forward compatibility.
@@ -251,6 +266,10 @@ type CardServiceServer interface {
 	UpdateCard(context.Context, *UpdateCardRequest) (*Card, error)
 	ArchiveCard(context.Context, *ArchiveCardRequest) (*Card, error)
 	PinChat(context.Context, *PinChatRequest) (*Card, error)
+	// GetTurnCaller names the conversation of the agent turn whose token the
+	// call carries and what it may use; a call without a live turn token is
+	// refused. A host's services check an agent's token with it.
+	GetTurnCaller(context.Context, *emptypb.Empty) (*TurnCaller, error)
 	mustEmbedUnimplementedCardServiceServer()
 }
 
@@ -305,6 +324,9 @@ func (UnimplementedCardServiceServer) ArchiveCard(context.Context, *ArchiveCardR
 }
 func (UnimplementedCardServiceServer) PinChat(context.Context, *PinChatRequest) (*Card, error) {
 	return nil, status.Error(codes.Unimplemented, "method PinChat not implemented")
+}
+func (UnimplementedCardServiceServer) GetTurnCaller(context.Context, *emptypb.Empty) (*TurnCaller, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTurnCaller not implemented")
 }
 func (UnimplementedCardServiceServer) mustEmbedUnimplementedCardServiceServer() {}
 func (UnimplementedCardServiceServer) testEmbeddedByValue()                     {}
@@ -597,6 +619,24 @@ func _CardService_PinChat_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CardService_GetTurnCaller_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CardServiceServer).GetTurnCaller(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CardService_GetTurnCaller_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CardServiceServer).GetTurnCaller(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CardService_ServiceDesc is the grpc.ServiceDesc for CardService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -663,6 +703,10 @@ var CardService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PinChat",
 			Handler:    _CardService_PinChat_Handler,
+		},
+		{
+			MethodName: "GetTurnCaller",
+			Handler:    _CardService_GetTurnCaller_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

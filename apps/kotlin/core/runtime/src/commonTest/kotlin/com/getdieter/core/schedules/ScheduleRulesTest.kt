@@ -329,6 +329,7 @@ class ScheduleRulesTest {
                 provider_options = mapOf("personality" to "pragmatic"),
                 vault_access = true,
                 mail_access = true,
+                home_assistant_access = true,
             )
         val agents =
             listOf(
@@ -370,6 +371,7 @@ class ScheduleRulesTest {
                 workspace_mode = "project",
                 vault_access = true,
                 mail_access = true,
+                home_assistant_access = true,
             )
         assertEquals(expected, draft, "a saved agent is kept even when the machine offers others")
         assertTrue(
