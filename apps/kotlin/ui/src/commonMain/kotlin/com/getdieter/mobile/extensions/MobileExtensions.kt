@@ -39,6 +39,12 @@ internal class MobileExtensions(
      */
     val wideBoards: Boolean = false,
     /**
+     * New task and the schedule editor offer "Allow Home Assistant access" next to vault access:
+     * the host lets agent turns of such conversations use Home Assistant (the add-on's relay checks
+     * each turn with the daemon).
+     */
+    val homeAssistantAccess: Boolean = false,
+    /**
      * The host's namer for new tasks and chats sent without a title, while the New task form is
      * open.
      */

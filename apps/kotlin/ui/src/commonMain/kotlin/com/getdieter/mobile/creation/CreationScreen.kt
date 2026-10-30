@@ -41,7 +41,8 @@ internal fun CreationScreen(store: MobileStore, chat: Boolean) {
     val intent by store.creation.intent.collectAsState()
     val preview by store.creation.preview.collectAsState()
     val busy by store.busy.collectAsState()
-    // a form opened with a Todo intent (e.g. an idea added to a queue by hand) starts on "Add to Todo"
+    // a form opened with a Todo intent (e.g. an idea added to a queue by hand) starts on "Add to
+    // Todo"
     var runNow by rememberSaveable { mutableStateOf(store.creation.intent.value.lane != "todo") }
     val prompt = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { prompt.requestFocus() } }
@@ -70,7 +71,10 @@ internal fun CreationScreen(store: MobileStore, chat: Boolean) {
     val namer = LocalMobileExtensions.current.conversationNamer(store)
     fun submit() = store.action {
         val id =
-            store.creation.submit(intent.copy(lane = if (chat || runNow) "running" else "todo"), namer)
+            store.creation.submit(
+                intent.copy(lane = if (chat || runNow) "running" else "todo"),
+                namer,
+            )
         store.dismiss()
         store.openConversation(id)
     }
@@ -373,8 +377,26 @@ internal fun CreationScreen(store: MobileStore, chat: Boolean) {
             }
             item("access") {
                 SectionHeader("Access")
-                Group(listOf(0, 1)) { index, position ->
-                    if (index == 0)
+                val homeAssistant = LocalMobileExtensions.current.homeAssistantAccess
+                Group(if (homeAssistant) listOf(0, 2, 1) else listOf(0, 1)) { index, position ->
+                    if (index == 2)
+                        ListRow(
+                            "Allow Home Assistant access",
+                            position = position,
+                            subtitle = "The agent may read and control Home Assistant",
+                            trailing = {
+                                DSwitch(
+                                    intent.home_assistant_access,
+                                    {
+                                        store.creation.update(
+                                            intent.copy(home_assistant_access = it)
+                                        )
+                                    },
+                                    Modifier.testTag("home-assistant-access"),
+                                )
+                            },
+                        )
+                    else if (index == 0)
                         ListRow(
                             "Allow vault access",
                             position = position,
