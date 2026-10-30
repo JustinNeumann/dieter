@@ -40,7 +40,8 @@ internal fun CreationScreen(store: MobileStore, chat: Boolean) {
     val intent by store.creation.intent.collectAsState()
     val preview by store.creation.preview.collectAsState()
     val busy by store.busy.collectAsState()
-    var runNow by rememberSaveable { mutableStateOf(true) }
+    // a form opened with a Todo intent (e.g. an idea added to a queue by hand) starts on "Add to Todo"
+    var runNow by rememberSaveable { mutableStateOf(store.creation.intent.value.lane != "todo") }
     val prompt = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { prompt.requestFocus() } }
     val pick =
