@@ -81,32 +81,71 @@ func TestBoardRetirementReceiptPersistenceAndRestore(t *testing.T) {
 	}
 }
 
-func TestBoardRetirementRefusesArchivedAndIncompleteReferences(t *testing.T) {
+func TestBoardRetirementKeepsArchivedCardsAndRefusesLiveOrIncompleteReferences(t *testing.T) {
 	t.Parallel()
-	for _, archived := range []bool{false, true} {
-		s := testkit.PeerStore(t, "owner")
-		p, b := lifecycleFixture(t, s)
-		card, err := s.Kanban.CreateCard(kanban.CreateCardInput{Project: p.ID, Board: b.ID, Title: "Keep", WorkspaceMode: "project"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if archived {
-			if _, err := s.Kanban.ArchiveCard(card.ID, true); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if _, err := s.Kanban.SetBoardRetired(kanban.BoardRetirementInput{BoardID: b.ID, Retired: true, ExpectedRevision: b.RetirementRevision, OperationID: "retire"}); err == nil {
-			t.Fatalf("archived=%v accepted referenced board", archived)
-		}
-	}
 	s := testkit.PeerStore(t, "owner")
-	_, b := lifecycleFixture(t, s)
+	p, b := lifecycleFixture(t, s)
+	card, err := s.Kanban.CreateCard(kanban.CreateCardInput{Project: p.ID, Board: b.ID, Title: "Keep", WorkspaceMode: "project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Kanban.SetBoardRetired(kanban.BoardRetirementInput{BoardID: b.ID, Retired: true, ExpectedRevision: b.RetirementRevision, OperationID: "retire-live"}); err == nil {
+		t.Fatal("accepted a board with a live card")
+	}
+	// fork: an archived card stays with the retired board and can still be read
+	if _, err := s.Kanban.ArchiveCard(card.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	retired, err := s.Kanban.SetBoardRetired(kanban.BoardRetirementInput{BoardID: b.ID, Retired: true, ExpectedRevision: b.RetirementRevision, OperationID: "retire"})
+	if err != nil || !retired.Retired || retired.RetirementBlocked {
+		t.Fatalf("archived card kept the board: %+v %v", retired, err)
+	}
+	if _, err = s.Kanban.ResolveBoard(p.ID, b.ID); !errors.Is(err, home.ErrNotFound) {
+		t.Fatalf("retired active resolution: %v", err)
+	}
+	cards, err := s.Kanban.ListCards(kanban.CardFilter{Project: p.ID, IncludeArchived: true})
+	if err != nil || len(cards) != 1 || cards[0].ID != card.ID || cards[0].BoardID != b.ID || !cards[0].Archived {
+		t.Fatalf("archived card: %+v %v", cards, err)
+	}
+	// unarchiving it makes the card live again, which keeps the board accessible
+	if _, err := s.Kanban.ArchiveCard(card.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.Kanban.ResolveBoard(p.ID, b.ID); err != nil || got.Retired || !got.RetirementBlocked {
+		t.Fatalf("unarchived card orphaned: %+v %v", got, err)
+	}
+	// an item whose archived state has not arrived yet counts as live
+	s = testkit.PeerStore(t, "owner")
+	_, b = lifecycleFixture(t, s)
 	identity, _ := s.Replica.PeerIdentity()
 	if _, err := s.Replica.PutPeerRecord(identity, "item", "pending.placement", "", replica.RawValue(map[string]string{"boardId": b.ID, "lane": "todo", "orderKey": "h"}), false); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.Kanban.SetBoardRetired(kanban.BoardRetirementInput{BoardID: b.ID, Retired: true, ExpectedRevision: b.RetirementRevision, OperationID: "retire"}); err == nil {
 		t.Fatal("incomplete item allowed retirement")
+	}
+}
+
+func TestBoardRetiredWithArchivedCardsOnEveryPeer(t *testing.T) {
+	t.Parallel()
+	a, b := testkit.PeerStore(t, "a"), testkit.PeerStore(t, "b")
+	p, board := lifecycleFixture(t, a)
+	card, err := a.Kanban.CreateCard(kanban.CreateCardInput{Project: p.ID, Board: board.ID, Title: "Done long ago", WorkspaceMode: "project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Kanban.ArchiveCard(card.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Kanban.SetBoardRetired(kanban.BoardRetirementInput{BoardID: board.ID, Retired: true, ExpectedRevision: board.RetirementRevision, OperationID: "retire"}); err != nil {
+		t.Fatal(err)
+	}
+	testkit.JoinPeers(t, a, b)
+	for _, s := range []*store.Store{a, b} {
+		got, err := s.Kanban.GetBoard(board.ID)
+		if err != nil || !got.Retired || got.RetirementBlocked {
+			t.Fatalf("archived card blocked the retirement: %+v %v", got, err)
+		}
 	}
 }
 

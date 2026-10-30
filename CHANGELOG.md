@@ -6,6 +6,15 @@ release. A stable release promotes one tested dev build; before you promote it,
 copy the **Unreleased** notes into a section named after that exact version
 (for example `## 0.6.412`). Promotion fails without that section.
 
+## Fork: server release v0.6.431-antigravity.7 (2026-10-30)
+
+- A board whose cards are all archived can be retired. Upstream keeps any board that an archived card still
+  points at, and Dieter can neither delete cards nor move them to another board, so a board once used stayed
+  forever. The archived cards stay with the retired board and can still be read; unarchiving one makes the
+  board accessible again, as a live reference from another machine already does. Each daemon decides this from
+  the replicated `archived` records: an item counts as archived only while every version says so. A daemon
+  without this change still shows such a board as blocked (accessible).
+
 ## Fork: server release v0.6.431-antigravity.6 (2026-10-29)
 
 - Synced with upstream Dieter 0.6.431 (Mail chart rendering, table layout and Android scrolling, #171 and

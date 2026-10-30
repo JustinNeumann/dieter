@@ -15,13 +15,37 @@ import (
 
 const absentBoardRetirement = "absent"
 
-// All surviving placement/schedule siblings count, including archived items and
-// incomplete dependencies. The index is built once, without projecting cards.
+// All surviving placement/schedule siblings count, including incomplete
+// dependencies, except items every peer agrees are archived: those stay with a
+// retired board (fork: archived cards cannot be deleted or moved, so they would
+// keep a board forever). The index is built once, without projecting cards.
 func boardReferenceIndex(data replica.PeerData) map[string][]string {
 	refs := map[string][]string{}
+	archived := map[string]bool{}
+	data.Fail(data.EachMatching("item/", ".archived", func(record crdt.Record) error {
+		id, field := crdt.SplitField(record.ID)
+		if field != "archived" {
+			return nil
+		}
+		// An unarchive on any peer, or an unreadable value, keeps the item live.
+		live, seen := false, false
+		for _, version := range record.Versions {
+			if version.Deleted {
+				continue
+			}
+			var value bool
+			seen = true
+			live = live || json.Unmarshal(version.Value, &value) != nil || !value
+		}
+		archived[id] = seen && !live
+		return nil
+	}))
 	visit := func(record crdt.Record) error {
 		id, field := crdt.SplitField(record.ID)
 		if !(record.Kind == "item" && field == "placement" || record.Kind == "schedule" && field == "summary") {
+			return nil
+		}
+		if record.Kind == "item" && archived[id] {
 			return nil
 		}
 		for _, version := range record.Versions {
@@ -190,19 +214,18 @@ func (s *Store) SetBoardRetired(input BoardRetirementInput) (model.Board, error)
 	if input.Retired {
 		// Check raw owner files too: unresolved projection dependencies must not
 		// hide a surviving local card or a schedule awaiting outbox publication.
-		for _, directory := range []string{s.home.CardDir(), s.home.ArchivedCardDir()} {
-			paths, err := home.ListMarkdown(directory)
-			if err != nil {
+		// Archived cards stay with the board (see boardReferenceIndex).
+		paths, err := home.ListMarkdown(s.home.CardDir())
+		if err != nil {
+			return zero, err
+		}
+		for _, path := range paths {
+			var card model.Card
+			if _, err := home.ReadMarkdown(path, &card); err != nil {
 				return zero, err
 			}
-			for _, path := range paths {
-				var card model.Card
-				if _, err := home.ReadMarkdown(path, &card); err != nil {
-					return zero, err
-				}
-				if card.BoardID == board.ID {
-					return zero, fault.Invalidf("board has surviving card %s", card.ID)
-				}
+			if card.BoardID == board.ID && !card.Archived {
+				return zero, fault.Invalidf("board has surviving card %s", card.ID)
 			}
 		}
 		if scheduleOnBoard := s.hooks.ScheduleOnBoard; scheduleOnBoard != nil {
