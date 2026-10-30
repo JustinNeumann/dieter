@@ -223,15 +223,16 @@ private fun NavigationRailBar(store: MobileStore, navigation: MobileNavigation) 
 
 /** One tab's stack: single pane with shared-axis motion, or list beside detail when wide. */
 /**
- * Whether [route] takes the whole width of a wide layout ([BoardRenderer.wide],
- * [ExtensionPage.wide]).
+ * Whether [route] takes the whole width of a wide layout ([MobileExtensions.wideBoards],
+ * [BoardRenderer.wide], [ExtensionPage.wide]).
  */
 @Composable
 private fun wideRoute(store: MobileStore, route: MobileRoute): Boolean {
     val extensions = LocalMobileExtensions.current
     return when (route) {
         is MobileRoute.Board ->
-            extensions.boardRenderer?.let { it.wide && it.claims(store, route.boardId) } == true
+            extensions.wideBoards ||
+                extensions.boardRenderer?.let { it.wide && it.claims(store, route.boardId) } == true
         is MobileRoute.Extension -> extensions.page(route.id)?.wide?.invoke(route.arg) == true
         else -> false
     }

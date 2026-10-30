@@ -34,6 +34,11 @@ internal class MobileExtensions(
     /** A board view of the host's own for the boards it claims (e.g. a Dreamfall stage). */
     val boardRenderer: BoardRenderer? = null,
     /**
+     * Every board takes the whole width of a wide layout, its lanes side by side, instead of the
+     * list pane; a card opens over it as on a phone (the add-on's page on desktops and tablets).
+     */
+    val wideBoards: Boolean = false,
+    /**
      * The host's namer for new tasks and chats sent without a title, while the New task form is
      * open.
      */

@@ -532,55 +532,62 @@ private fun ParallelLanes(
     edit: (Card) -> Unit,
 ) {
     val drag = remember(board?.id) { BoardCardDragState() }
-    Row(
-        Modifier.fillMaxSize()
-            .horizontalScroll(rememberScrollState())
-            .padding(start = ScreenMargin, top = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        lanes.forEach { lane ->
-            val target = drag.targetLaneId == lane.lane_id
-            Column(
-                Modifier.width(300.dp)
-                    .fillMaxHeight()
-                    .onGloballyPositioned { drag.registerLane(lane.lane_id, it.boundsInRoot()) }
-                    .clip(RoundedCornerShape(if (apple) 26.dp else 24.dp))
-                    .background(
-                        if (target) palette.accentContainer
-                        else palette.fill.copy(alpha = palette.fill.alpha * .6f)
-                    )
-            ) {
-                Row(
-                    Modifier.fillMaxWidth()
-                        .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+    // The lanes share the width (a desktop shows them all), down to a readable minimum; narrower
+    // than that, the row scrolls.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val laneWidth =
+            ((maxWidth - ScreenMargin * 2 - 14.dp * (lanes.size - 1)) / lanes.size)
+                .coerceAtLeast(260.dp)
+        Row(
+            Modifier.fillMaxSize()
+                .horizontalScroll(rememberScrollState())
+                .padding(start = ScreenMargin, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            lanes.forEach { lane ->
+                val target = drag.targetLaneId == lane.lane_id
+                Column(
+                    Modifier.width(laneWidth)
+                        .fillMaxHeight()
+                        .onGloballyPositioned { drag.registerLane(lane.lane_id, it.boundsInRoot()) }
+                        .clip(RoundedCornerShape(if (apple) 26.dp else 24.dp))
+                        .background(
+                            if (target) palette.accentContainer
+                            else palette.fill.copy(alpha = palette.fill.alpha * .6f)
+                        )
                 ) {
-                    Text(
-                        lane.name,
-                        Modifier.weight(1f),
-                        style = type.headline,
-                        color = palette.label,
-                    )
-                    Text(
-                        "${lane.card_ids.size}",
-                        style = type.subheadline,
-                        color = palette.secondaryLabel,
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .padding(start = 18.dp, end = 12.dp, top = 14.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            lane.name,
+                            Modifier.weight(1f),
+                            style = type.headline,
+                            color = palette.label,
+                        )
+                        Text(
+                            "${lane.card_ids.size}",
+                            style = type.subheadline,
+                            color = palette.secondaryLabel,
+                        )
+                    }
+                    LaneList(
+                        store,
+                        board?.id.orEmpty(),
+                        lane,
+                        cards,
+                        board,
+                        selected,
+                        session,
+                        bottom,
+                        drag,
+                        edit,
                     )
                 }
-                LaneList(
-                    store,
-                    board?.id.orEmpty(),
-                    lane,
-                    cards,
-                    board,
-                    selected,
-                    session,
-                    bottom,
-                    drag,
-                    edit,
-                )
             }
+            Spacer(Modifier.width(2.dp))
         }
-        Spacer(Modifier.width(2.dp))
     }
 }
