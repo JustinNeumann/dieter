@@ -31,7 +31,11 @@ test("registers the question, polls until the host answered and returns the tool
         seen.posts.push(JSON.parse(body));
         return res.end(JSON.stringify({ ok: true, token: "t0k3n" }));
       }
-      if (req.method === "GET" && req.url === "/api/questions/tool-1" && req.headers["x-question-token"] === "t0k3n") {
+      if (
+        req.method === "GET" &&
+        req.url === "/api/questions/tool-1" &&
+        req.headers["x-question-token"] === "t0k3n"
+      ) {
         seen.polls += 1;
         return res.end(
           JSON.stringify(seen.polls < 3 ? { done: false } : { done: true, output: answer }),
