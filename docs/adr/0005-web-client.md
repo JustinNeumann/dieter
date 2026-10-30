@@ -2,7 +2,7 @@
 
 - Status: accepted in the fork (JustinNeumann/dieter), 2026-10
 - Reference implementation and upstream proposal:
-  [dieter-addon-kotlin](https://github.com/JustinNeumann/dieter-addon-kotlin)
+  [dieter-addon](https://github.com/JustinNeumann/dieter-addon)
   (`docs/proposals/web-client.md`)
 
 ## Context
@@ -56,7 +56,7 @@ Claude sign-in, its SSH key, work-folder retention, repositories under
   Extensions are presentation like the screens around them. They keep drafts
   and call a core. The default is empty, so the native apps don't change.
 - **A host's own features have their own core.** The add-on core
-  (dieter-addon-kotlin `addon/`) runs in the web host beside Dieter's core. It
+  (dieter-addon `addon/`) runs in the web host beside Dieter's core. It
   has its own protocol (`dieter.addon.v1`): commands, plus slices for the
   gateway, SSH, Claude, settings and questions. It reaches the add-on's bridge
   on loopback. Its pure rules (`AddonRules`: addresses, repositories, answer
