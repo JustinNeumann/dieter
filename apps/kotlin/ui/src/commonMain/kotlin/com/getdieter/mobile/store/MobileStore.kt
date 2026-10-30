@@ -82,13 +82,28 @@ class MobileStore(
 
     // Navigation -------------------------------------------------------------------------------
 
-    /** Switches tabs; selecting the current tab again returns to its root, as on both platforms. */
+    /**
+     * Switches tabs; selecting the current tab again returns to its root, as on both platforms.
+     * Switching to Projects while it shows its list opens the project used last on this device.
+     */
     fun selectTab(value: MobileTab) {
         val current = routes.value
-        routes.value =
+        val next =
             if (current.tab == value) current.with(value, listOf(MobileRoute.Root(value)))
             else current.copy(tab = value)
+        val last = lastProject().takeIf { value == MobileTab.PROJECTS && current.tab != value && next.stack.size == 1 }
+        routes.value = if (last == null) next else next.with(value, next.stack + MobileRoute.Project(last))
         syncNavigation()
+    }
+
+    /** The project last opened or created in on this device (the core's creation memory), if it still exists. */
+    fun lastProject(): String? =
+        creation.defaults.value.project_id.takeIf { id -> id.isNotEmpty() && workspace.slice.value.projects.any { it.id == id } }
+
+    /** Tells the core [projectId] was used: it leads the Projects list and New task preselects it. */
+    internal fun useProject(projectId: String) {
+        if (projectId.isNotEmpty() && projectId != creation.defaults.value.project_id)
+            command(Command(remember_creation = RememberCreation(project_id = projectId)))
     }
 
     fun push(route: MobileRoute) {
@@ -241,6 +256,12 @@ class MobileStore(
                 if (project.projectId != boards.selectedProject.value)
                     boards.selectProject(project.projectId)
             }
+        // the innermost of a conversation, board or project is the one in use
+        (cardId?.let { id -> workspace.slice.value.cards.firstOrNull { it.id == id }?.project_id }
+                ?: boards.selectedProject.value.takeIf {
+                    stack.any { it is MobileRoute.Project || it is MobileRoute.Board }
+                })
+            ?.let(::useProject)
         if (cardId == null) {
             if (conversation.selectedCard.value.isNotEmpty()) conversation.unbind()
         } else {

@@ -30,6 +30,7 @@ import com.getdieter.core.composition.Attachments
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.design.Tone
+import com.getdieter.mobile.extensions.LocalMobileExtensions
 import com.getdieter.mobile.platform.*
 import com.getdieter.mobile.store.*
 
@@ -66,9 +67,10 @@ internal fun CreationScreen(store: MobileStore, chat: Boolean) {
     val boards = workspace.boards.filter { it.project_id == intent.project_id }
     val board = boards.firstOrNull { it.id == intent.board_id }
     val ready = preview.problem.isEmpty() && intent.prompt.isNotBlank() && !busy
+    val namer = LocalMobileExtensions.current.conversationNamer(store)
     fun submit() = store.action {
         val id =
-            store.creation.submit(intent.copy(lane = if (chat || runNow) "running" else "todo"))
+            store.creation.submit(intent.copy(lane = if (chat || runNow) "running" else "todo"), namer)
         store.dismiss()
         store.openConversation(id)
     }

@@ -1,6 +1,7 @@
 package com.getdieter.mobile.store
 
 import com.getdieter.api.v1.Board
+import com.getdieter.api.v1.Card
 import com.getdieter.api.v1.Project
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.navigation.*
@@ -99,6 +100,50 @@ class MobileStoreTest {
     }
 
     @Test
+    fun theProjectUsedLastIsRememberedAndTheProjectsTabOpensIt() = runTest {
+        val core = FakeMobileCore()
+        val store = store(core)
+        try {
+            runCurrent()
+            core.publish(
+                Slice.SLICE_WORKSPACE,
+                update =
+                    Update(
+                        workspace =
+                            WorkspaceSlice(
+                                projects = listOf(Project(id = "p1"), Project(id = "p2")),
+                                boards = listOf(Board(id = "b2", project_id = "p2")),
+                                loaded = true,
+                            )
+                    ),
+            )
+            runCurrent()
+            store.selectTab(MobileTab.PROJECTS)
+            assertEquals(1, store.routes.value.stack.size, "nothing used yet: the list")
+            store.push(MobileRoute.Board("b2"))
+            runCurrent()
+            assertEquals(listOf("p2"), core.sentOf { it.remember_creation }.map { it.project_id })
+            core.publish(Slice.SLICE_CREATION, update = Update(creation = CreationSlice(project_id = "p2")))
+            runCurrent()
+            store.selectTab(MobileTab.PROJECTS)
+            assertEquals(1, store.routes.value.stack.size, "selecting Projects again still returns to the list")
+            store.selectTab(MobileTab.INBOX)
+            store.selectTab(MobileTab.PROJECTS)
+            assertEquals(MobileRoute.Project("p2"), store.routes.value.top)
+            runCurrent()
+            assertEquals(1, core.sentOf { it.remember_creation }.size, "the remembered project is not sent again")
+            core.publish(Slice.SLICE_CREATION, update = Update(creation = CreationSlice(project_id = "gone")))
+            runCurrent()
+            store.selectTab(MobileTab.PROJECTS)
+            store.selectTab(MobileTab.INBOX)
+            store.selectTab(MobileTab.PROJECTS)
+            assertEquals(1, store.routes.value.stack.size, "a removed project is not opened")
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
     fun leavingADocumentReturnsTheFilesScopeToItsListing() = runTest {
         val core = FakeMobileCore()
         val store = store(core)
@@ -117,6 +162,54 @@ class MobileStoreTest {
             val close = core.sentOf { it.files }.last()
             assertEquals(MobileStore.FILES_SCOPE, close.scope)
             assertNotNull(close.close)
+        } finally {
+            store.close()
+        }
+    }
+
+    @Test
+    fun aHostThatNamesTasksOnTheirMachineGetsThemUnderThePlaceholder() = runTest {
+        var created = 0
+        val core = FakeMobileCore { command ->
+            command.creation_preview?.let {
+                Result(creation_preview = CreationPreview(intent = it.intent, daemon_id = "d-ha"))
+            }
+                ?: command.create_conversation?.let { Result(card = Card(id = "c-${++created}")) }
+                ?: Result(done = Done())
+        }
+        val named = mutableListOf<List<Any>>()
+        val namer =
+            object : ConversationNamer {
+                override fun names(daemonId: String) = daemonId == "d-ha"
+
+                override suspend fun name(id: String, chat: Boolean, prompt: String, provisional: String) {
+                    named += listOf(id, chat, prompt, provisional)
+                }
+            }
+        val store = store(core)
+        try {
+            store.newConversation(chat = false)
+            store.creation.update(store.creation.intent.value.copy(prompt = "  Fix the heating in the bath\nsoon"))
+            advanceTimeBy(200)
+            runCurrent()
+            val id = store.creation.submit(CreationIntent(lane = "todo"), namer)
+            val sent = core.sentOf { it.create_conversation }.last().intent!!
+            assertEquals("Fix the heating in the bath", sent.title, "Dieter's placeholder: no auto-title")
+            assertEquals(listOf<List<Any>>(listOf(id, false, "Fix the heating in the bath\nsoon", sent.title)), named)
+            // a title of one's own, or another machine: Dieter's way
+            store.creation.update(store.creation.intent.value.copy(title = "Heating"))
+            advanceTimeBy(200)
+            runCurrent()
+            store.creation.submit(CreationIntent(lane = "todo"), namer)
+            assertEquals("Heating", core.sentOf { it.create_conversation }.last().intent!!.title)
+            store.creation.update(store.creation.intent.value.copy(title = ""))
+            advanceTimeBy(200)
+            runCurrent()
+            store.creation.submit(CreationIntent(lane = "todo"), object : ConversationNamer by namer {
+                override fun names(daemonId: String) = false
+            })
+            assertEquals("", core.sentOf { it.create_conversation }.last().intent!!.title)
+            assertEquals(1, named.size)
         } finally {
             store.close()
         }

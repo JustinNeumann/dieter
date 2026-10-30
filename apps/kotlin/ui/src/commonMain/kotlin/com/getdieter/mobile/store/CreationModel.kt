@@ -2,6 +2,7 @@ package com.getdieter.mobile.store
 
 import com.getdieter.api.v1.HarnessSelection
 import com.getdieter.client.v1.*
+import com.getdieter.core.composition.Titles
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -9,6 +10,17 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+/**
+ * A host that names new tasks and chats itself instead of Dieter's auto-title (the add-on: a local
+ * model through Home Assistant), for the machines it [names].
+ */
+interface ConversationNamer {
+    fun names(daemonId: String): Boolean
+
+    /** [id] was created under [provisional], Dieter's placeholder; the host renames it from [prompt]. */
+    suspend fun name(id: String, chat: Boolean, prompt: String, provisional: String)
+}
 
 /** The new task or chat form: the core's defaults and preview of the form's intent. */
 class CreationModel
@@ -102,17 +114,32 @@ internal constructor(
             }
     }
 
-    suspend fun submit(intent: CreationIntent): String {
+    /**
+     * Creates the form's conversation in [intent]'s lane. Sent without a title to a machine [namer]
+     * names, it is created under Dieter's placeholder title, without the auto-title, and handed to it.
+     */
+    suspend fun submit(intent: CreationIntent, namer: ConversationNamer? = null): String {
         previewJob?.join()
-        val resolved = this.intent.value.copy(lane = intent.lane)
-        return context.core
-            .dispatch(
-                Command(
-                    create_conversation = CreateConversation(chat = chat.value, intent = resolved)
+        val form = this.intent.value
+        val provisional =
+            namer
+                ?.takeIf { Titles.generated(form.title, form.prompt) && it.names(preview.value.daemon_id) }
+                ?.let {
+                    if (chat.value) Titles.chat(form.prompt, form.attachments)
+                    else Titles.creation("", form.prompt, form.attachments)
+                }
+        val resolved = form.copy(lane = intent.lane, title = provisional ?: form.title)
+        val id =
+            context.core
+                .dispatch(
+                    Command(
+                        create_conversation = CreateConversation(chat = chat.value, intent = resolved)
+                    )
                 )
-            )
-            .card
-            ?.id ?: error("The core returned no conversation.")
+                .card
+                ?.id ?: error("The core returned no conversation.")
+        if (provisional != null) namer?.name(id, chat.value, form.prompt.trim(), provisional)
+        return id
     }
 
     /** Creates a task on the selected board, or the first one. */

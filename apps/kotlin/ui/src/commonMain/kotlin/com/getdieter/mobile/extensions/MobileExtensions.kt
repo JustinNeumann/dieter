@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.getdieter.mobile.design.Glyph
 import com.getdieter.mobile.navigation.ToolPage
+import com.getdieter.mobile.store.ConversationNamer
 import com.getdieter.mobile.store.MobileStore
 
 /**
@@ -29,6 +30,8 @@ internal class MobileExtensions(
     val projectActions: List<ExtensionAction> = emptyList(),
     /** A board view of the host's own for the boards it claims (e.g. a Dreamfall stage). */
     val boardRenderer: BoardRenderer? = null,
+    /** The host's namer for new tasks and chats sent without a title, while the New task form is open. */
+    val conversationNamer: @Composable (MobileStore) -> ConversationNamer? = { null },
 ) {
     fun page(id: String): ExtensionPage? = pages.firstOrNull { it.id == id }
 }

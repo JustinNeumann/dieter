@@ -32,6 +32,7 @@ internal fun ProjectsScreen(store: MobileStore) {
     val workspace by store.workspace.slice.collectAsState()
     val navigation by store.workspace.navigation.collectAsState()
     val session by store.session.slice.collectAsState()
+    val creation by store.creation.defaults.collectAsState()
     var search by rememberSaveable { mutableStateOf("") }
     var create by remember { mutableStateOf(false) }
     var editFolder by remember { mutableStateOf<NavigationFolder?>(null) }
@@ -109,6 +110,15 @@ internal fun ProjectsScreen(store: MobileStore) {
                 )
             }
             val pinned = layout?.pinned.orEmpty().filter(::matches)
+            // the project used last on this device leads, unless pinned projects already do
+            val last =
+                creation.project_id.takeIf { id ->
+                    search.isBlank() && order.size > 1 && id in order && id !in layout?.pinned.orEmpty()
+                }
+            if (last != null) {
+                item("last-header") { SectionHeader("Last used", prominent = true) }
+                projectGroup(store, last, "last")
+            }
             if (pinned.isNotEmpty()) {
                 item("pinned-header") { SectionHeader("Pinned", prominent = true) }
                 pinned.forEach { id -> projectGroup(store, id, "pinned") }
@@ -124,7 +134,7 @@ internal fun ProjectsScreen(store: MobileStore) {
             }
             val unfiled = (layout?.unfiled ?: order).filter(::matches)
             if (unfiled.isNotEmpty()) {
-                if (pinned.isNotEmpty() || layout?.folders.orEmpty().isNotEmpty())
+                if (last != null || pinned.isNotEmpty() || layout?.folders.orEmpty().isNotEmpty())
                     item("all-header") { SectionHeader("All projects", prominent = true) }
                 unfiled.forEach { id -> projectGroup(store, id, "unfiled") }
             }
