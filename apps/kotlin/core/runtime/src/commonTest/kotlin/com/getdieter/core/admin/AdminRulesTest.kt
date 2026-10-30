@@ -547,4 +547,17 @@ class AdminRulesTest {
                 .isEmpty()
         )
     }
+
+    @Test
+    fun aBoardTheDaemonKeepsSaysWhy() {
+        assertEquals(
+            "Only an empty board can be archived: this one still has cards, archived cards included.",
+            BoardRetirement.refusal("grpc-status=3, grpc-message=board has surviving card c_0123456789abcdef01234567"),
+        )
+        assertEquals(
+            "Only an empty board can be archived: a schedule still belongs to this one.",
+            BoardRetirement.refusal("board has surviving schedule sch_0123456789ab"),
+        )
+        assertNull(BoardRetirement.refusal("connection reset"))
+    }
 }

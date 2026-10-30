@@ -22,6 +22,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,10 +37,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.getdieter.mobile.app.*
 
 // ---------------------------------------------------------------------------------------------
@@ -429,13 +432,29 @@ internal fun FilterPill(
     dot: Color? = null,
     glyph: Glyph? = null,
     trailingChevron: Boolean = false,
+    /** For rows that must stay narrow: no check mark (the fill shows the choice), a 13 sp label with 10 dp around it. */
+    dense: Boolean = false,
 ) {
     if (!apple) {
         FilterChip(
             selected,
             onClick,
-            label = { Text(text, maxLines = 1) },
-            modifier = modifier,
+            label = {
+                Text(
+                    text,
+                    if (dense)
+                        Modifier.layout { measurable, constraints ->
+                            val label = measurable.measure(constraints)
+                            val cut = 6.dp.roundToPx()
+                            layout(label.width - 2 * cut, label.height) { label.place(-cut, 0) }
+                        }
+                    else Modifier,
+                    style = if (dense) LocalTextStyle.current.copy(fontSize = 13.sp) else LocalTextStyle.current,
+                    maxLines = 1,
+                )
+            },
+            // a chip narrower than its touch target would sit inside it, off the row's edge
+            modifier = if (dense) modifier.widthIn(min = 48.dp) else modifier,
             leadingIcon =
                 when {
                     dot != null -> {
@@ -444,7 +463,7 @@ internal fun FilterPill(
                     glyph != null -> {
                         { Icon(glyph, null, size = 18.dp) }
                     }
-                    selected -> {
+                    selected && !dense -> {
                         { Icon(Glyph.CHECK, null, size = 18.dp) }
                     }
                     else -> null

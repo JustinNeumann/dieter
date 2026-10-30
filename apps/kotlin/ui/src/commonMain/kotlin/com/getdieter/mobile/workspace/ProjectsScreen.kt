@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.getdieter.api.v1.Board
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.admin.*
 import com.getdieter.mobile.app.*
@@ -263,11 +264,13 @@ private fun ProjectGroup(store: MobileStore, id: String) {
     val session by store.session.slice.collectAsState()
     val navigation by store.workspace.navigation.collectAsState()
     val order = LocalMobileExtensions.current.boardOrder(store)
+    val groups = LocalMobileExtensions.current.boardGroups(store)
     val project = workspace.projects.firstOrNull { it.id == id } ?: return
     val boards = workspace.boards.filter { it.project_id == id }.let { order?.sorted?.invoke(it) ?: it }
-    val ids = boards.map { it.id }
+    val entries = boardEntries(boards, groups)
+    val ids = entries.map { it.id }
     val drag = remember(id) { BoardDrag() }
-    val count = boards.size + 1
+    val count = entries.size + 1
     val machines =
         project.checkouts
             .map { checkout ->
@@ -318,13 +321,34 @@ private fun ProjectGroup(store: MobileStore, id: String) {
                 }
             }
         }
-        boards.forEachIndexed { index, board ->
+        entries.forEachIndexed { index, entry ->
+            val dragging =
+                if (order != null && ids.size > 1)
+                    drag.modifier(entry.id, ids) { moved -> order.move(moved.flatMap { e -> entries.first { it.id == e }.boardIds }) }
+                else Modifier
+            val group = entry.group
+            if (group != null) {
+                ListRow(
+                    group.title,
+                    Modifier.testTag("board-group-${entry.id}").then(dragging),
+                    position = Position.of(index + 1, count),
+                    glyph = group.glyph,
+                    glyphTint = Color(group.tint),
+                    value = group.value,
+                    accessory = Accessory.CHEVRON,
+                    trailing =
+                        if (group.attention > 0) ({ CountBadge(group.attention, color = palette.warning) })
+                        else null,
+                    onClick = { store.showFrom(MobileRoute.Root(MobileTab.PROJECTS), group.route) },
+                )
+                return@forEachIndexed
+            }
+            val board = entry.board
             val cards = workspace.cards.count { it.board_id == board.id }
             val attention = workspace.board_attention[board.id] ?: 0
             ListRow(
                 board.name,
-                Modifier.testTag("board-row-${board.id}")
-                    .then(if (order != null && ids.size > 1) drag.modifier(board.id, ids, order) else Modifier),
+                Modifier.testTag("board-row-${board.id}").then(dragging),
                 position = Position.of(index + 1, count),
                 glyph = Glyph.BOARD,
                 glyphTint = labelColor(com.getdieter.core.admin.Labels.stable(board.id)),
@@ -437,6 +461,23 @@ internal fun projectMenu(
     )
 }
 
+/** A row under a project: a board, or a host's [group] of boards in the place of its first. */
+private class BoardEntry(val board: Board, val group: BoardGroup?) {
+    val id: String get() = board.id
+    /** The boards it stands for, in the project's order. */
+    var boardIds: List<String> = listOf(board.id)
+}
+
+private fun boardEntries(boards: List<Board>, groups: List<BoardGroup>): List<BoardEntry> {
+    val entries = mutableListOf<BoardEntry>()
+    for (board in boards) {
+        val group = groups.firstOrNull { board.id in it.boardIds }
+        val entry = group?.let { g -> entries.firstOrNull { it.group === g } }
+        if (entry != null) entry.boardIds += board.id else entries += BoardEntry(board, group)
+    }
+    return entries
+}
+
 /** A board row dragged within its project after a long press: the others make room, the drop reorders. */
 private class BoardDrag {
     private var dragged by mutableStateOf<String?>(null)
@@ -458,7 +499,7 @@ private class BoardDrag {
         }
     }
 
-    fun modifier(id: String, ids: List<String>, order: BoardOrder): Modifier =
+    fun modifier(id: String, ids: List<String>, move: (List<String>) -> Unit): Modifier =
         Modifier.onSizeChanged { if (dragged == null) rowHeight = it.height.coerceAtLeast(1) }
             .zIndex(if (dragged == id) 1f else 0f)
             .graphicsLayer { translationY = shift(ids, id) }
@@ -478,7 +519,7 @@ private class BoardDrag {
                         val to = target(ids)
                         dragged = null
                         offset = 0f
-                        if (to != from) order.move(ids.toMutableList().apply { add(to, removeAt(from)) })
+                        if (to != from) move(ids.toMutableList().apply { add(to, removeAt(from)) })
                     },
                 )
             }
@@ -500,7 +541,9 @@ internal fun ProjectScreen(store: MobileStore, projectId: String) {
         return
     }
     val order = LocalMobileExtensions.current.boardOrder(store)
+    val groups = LocalMobileExtensions.current.boardGroups(store)
     val boards = workspace.boards.filter { it.project_id == projectId }.let { order?.sorted?.invoke(it) ?: it }
+    val entries = boardEntries(boards, groups)
     val chrome =
         ScreenChrome(
             project.name,
@@ -567,14 +610,32 @@ internal fun ProjectScreen(store: MobileStore, projectId: String) {
                         onClick = { editing = "New board" },
                     )
                 }
-            itemsIndexed(boards, key = { _, board -> board.id }) { index, board ->
+            itemsIndexed(entries, key = { _, entry -> entry.id }) { index, entry ->
+                val group = entry.group
+                if (group != null) {
+                    ListRow(
+                        group.title,
+                        Modifier.testTag("board-group-${entry.id}"),
+                        position = Position.of(index, entries.size),
+                        subtitle = group.subtitle,
+                        glyph = group.glyph,
+                        tile = Color(group.tint),
+                        accessory = Accessory.CHEVRON,
+                        trailing =
+                            if (group.attention > 0) ({ CountBadge(group.attention, color = palette.warning) })
+                            else null,
+                        onClick = { store.showFrom(MobileRoute.Project(projectId), group.route) },
+                    )
+                    return@itemsIndexed
+                }
+                val board = entry.board
                 val cards = workspace.cards.filter { it.board_id == board.id }
                 val running = cards.count { it.lane == "running" }
                 val attention = workspace.board_attention[board.id] ?: 0
                 ListRow(
                     board.name,
                     Modifier.testTag("board-row-${board.id}"),
-                    position = Position.of(index, boards.size),
+                    position = Position.of(index, entries.size),
                     subtitle =
                         buildList {
                                 add("${cards.size} card${if (cards.size == 1) "" else "s"}")
@@ -591,6 +652,25 @@ internal fun ProjectScreen(store: MobileStore, projectId: String) {
                         store.showFrom(MobileRoute.Project(projectId), MobileRoute.Board(board.id))
                     },
                 )
+            }
+            val retired = workspace.retired_boards.filter { it.project_id == projectId }
+            if (retired.isNotEmpty()) {
+                item { SectionHeader("Archived boards") }
+                item {
+                    Group(retired) { board, position ->
+                        ListRow(
+                            board.name,
+                            Modifier.testTag("archived-board-${board.id}"),
+                            position = position,
+                            glyph = Glyph.ARCHIVE,
+                            tile = palette.secondaryLabel,
+                            accessory = Accessory.CHEVRON,
+                            onClick = {
+                                store.showFrom(MobileRoute.Project(projectId), MobileRoute.Board(board.id))
+                            },
+                        )
+                    }
+                }
             }
             item { SectionHeader("Workspace") }
             item {

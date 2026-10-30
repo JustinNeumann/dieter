@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.getdieter.mobile.design.Glyph
+import com.getdieter.mobile.navigation.MobileRoute
 import com.getdieter.mobile.navigation.ToolPage
 import com.getdieter.mobile.store.ConversationNamer
 import com.getdieter.mobile.store.MobileStore
@@ -34,6 +35,10 @@ internal class MobileExtensions(
     val conversationNamer: @Composable (MobileStore) -> ConversationNamer? = { null },
     /** A board order of the host's own; without one, boards keep Dieter's order. */
     val boardOrder: @Composable (MobileStore) -> BoardOrder? = { null },
+    /** Boards the host lists in Projects as one row of its own (e.g. a Dreamfall board's stage boards). */
+    val boardGroups: @Composable (MobileStore) -> List<BoardGroup> = { emptyList() },
+    /** Quotas the host reads itself, as more bars in the Inbox's usage strip. */
+    val usageBars: @Composable (MobileStore) -> List<UsageBar> = { emptyList() },
 ) {
     fun page(id: String): ExtensionPage? = pages.firstOrNull { it.id == id }
 }
@@ -97,6 +102,26 @@ internal class BoardOrder(
     /** A project's boards, dragged into this order. */
     val move: (List<String>) -> Unit,
 )
+
+/** Boards in one row of the host's: it takes the place of the first of them and is dragged as one. */
+@Immutable
+internal class BoardGroup(
+    val boardIds: List<String>,
+    val title: String,
+    /** The row's second line on the project's page, e.g. "Dreamfall · 42 ideas". */
+    val subtitle: String,
+    val glyph: Glyph,
+    val tint: Long,
+    /** The number at the row's end. */
+    val value: String,
+    /** The warning badge after it; 0 for none. */
+    val attention: Int,
+    val route: MobileRoute,
+)
+
+/** A quota of the host's, drawn like a provider's in the Inbox: [remaining] percent left. */
+@Immutable
+internal class UsageBar(val name: String, val remaining: Int)
 
 internal val LocalMobileExtensions = staticCompositionLocalOf { MobileExtensions() }
 

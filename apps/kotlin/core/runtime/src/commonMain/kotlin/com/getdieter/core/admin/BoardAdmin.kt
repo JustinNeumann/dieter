@@ -13,7 +13,9 @@ import com.getdieter.api.v1.UpdateBoardHostnamesRequest
 import com.getdieter.api.v1.UpdateBoardLabelRequest
 import com.getdieter.core.runtime.CoreException
 import com.getdieter.core.runtime.FailureKind
+import com.getdieter.core.runtime.Failures
 import com.getdieter.core.store.WorkspaceStore
+import kotlin.coroutines.cancellation.CancellationException
 import okio.ByteString.Companion.encodeUtf8
 
 /**
@@ -129,6 +131,16 @@ internal constructor(private val calls: AdminCalls, private val store: Workspace
      */
     suspend fun setRetired(boardId: String, retired: Boolean): Board {
         val route = AdminRoute.Observer("board/$boardId.retired", calls.projectOf(boardId))
+        return try {
+            retire(route, boardId, retired)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw BoardRetirement.refusal(e.message.orEmpty())?.let { CoreException(Failures.kind(e), it, e) } ?: e
+        }
+    }
+
+    private suspend fun retire(route: AdminRoute, boardId: String, retired: Boolean): Board {
         return calls
             .idempotent("board", "retire:$boardId:$retired".encodeUtf8()) { operationId ->
                 calls.call(route) { client ->

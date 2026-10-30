@@ -9,11 +9,9 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -73,6 +71,9 @@ internal fun InboxScreen(store: MobileStore) {
         }
     fun count(value: InboxFilter) = scoped.count { it.matches(value) }
     val rows = scoped.filter { it.matches(filter) }
+    val bars =
+        quotas.group_rows.filter { it.lowest_remaining >= 0 }.map { UsageBar(it.provider_name, it.lowest_remaining) } +
+            extensions.usageBars(store)
     val running = view.summary?.running ?: 0
     val attention = view.summary?.attention ?: 0
     val projectName = workspace.projects.firstOrNull { it.id == project }?.name
@@ -166,11 +167,11 @@ internal fun InboxScreen(store: MobileStore) {
                     )
                 }
                 item("filters") {
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = ScreenMargin, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    // narrow panes wrap the filters rather than cutting the last one off
+                    FlowRow(
+                        Modifier.fillMaxWidth().padding(horizontal = ScreenMargin, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         InboxFilter.entries.forEach { value ->
                             val total = count(value)
@@ -180,6 +181,7 @@ internal fun InboxScreen(store: MobileStore) {
                                 filter == value,
                                 { filter = value },
                                 Modifier.testTag("inbox-filter-${value.name.lowercase()}"),
+                                dense = true,
                             )
                         }
                     }
@@ -201,9 +203,9 @@ internal fun InboxScreen(store: MobileStore) {
                             )
                         }
                     }
-                if (quotas.group_rows.any { it.lowest_remaining >= 0 })
+                if (bars.isNotEmpty())
                     item("usage") {
-                        UsageStrip(quotas) {
+                        UsageStrip(bars) {
                             store.showFrom(
                                 MobileRoute.Root(MobileTab.INBOX),
                                 MobileRoute.Tool(ToolPage.USAGE),
@@ -673,8 +675,7 @@ private fun BoxScope.RunningSweep(tint: Color) {
 }
 
 @Composable
-private fun UsageStrip(quotas: QuotasSlice, open: () -> Unit) {
-    val groups = quotas.group_rows.filter { it.lowest_remaining >= 0 }
+private fun UsageStrip(bars: List<UsageBar>, open: () -> Unit) {
     Row(
         Modifier.fillMaxWidth()
             .padding(horizontal = ScreenMargin, vertical = 6.dp)
@@ -687,23 +688,23 @@ private fun UsageStrip(quotas: QuotasSlice, open: () -> Unit) {
     ) {
         Icon(Glyph.USAGE, null, tint = palette.secondaryLabel, size = 20.dp)
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            groups.take(3).forEach { group ->
-                val low = group.lowest_remaining < 20
+            bars.take(3).forEach { bar ->
+                val low = bar.remaining < 20
                 Column(Modifier.weight(1f)) {
                     Text(
-                        group.provider_name,
+                        bar.name,
                         style = type.caption,
                         color = palette.secondaryLabel,
                         maxLines = 1,
                     )
                     Spacer(Modifier.height(4.dp))
                     ProgressBar(
-                        group.lowest_remaining / 100f,
+                        bar.remaining / 100f,
                         color = if (low) palette.warning else palette.success,
                     )
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "${group.lowest_remaining}% left",
+                        "${bar.remaining}% left",
                         style = type.caption.copy(fontWeight = FontWeight.Medium),
                         color = palette.label,
                     )

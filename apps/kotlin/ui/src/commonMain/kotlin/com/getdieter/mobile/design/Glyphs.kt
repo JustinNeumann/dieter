@@ -113,6 +113,7 @@ internal enum class Glyph(val symbol: String, private val material: () -> ImageV
     SUN("sun.max", { Icons.Outlined.LightMode }),
     BOLT("bolt", { Icons.Outlined.Bolt }),
     SPARKLES("sparkles", { Icons.Outlined.AutoAwesome }),
+    WATERFALL("chart.bar.xaxis.ascending", { Icons.Outlined.WaterfallChart }),
     BRAIN("brain", { Icons.Outlined.AutoAwesome }),
     CPU("cpu", { Icons.Outlined.Memory }),
     LINK("link", { Icons.Outlined.Link }),

@@ -48,10 +48,12 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
     val target by store.boards.filter.collectAsState()
     val session by store.session.slice.collectAsState()
     val selectedCard by store.conversation.selectedCard.collectAsState()
-    val board = workspace.boards.firstOrNull { it.id == boardId }
+    val retired = workspace.retired_boards.firstOrNull { it.id == boardId }
+    val board = workspace.boards.firstOrNull { it.id == boardId } ?: retired
     val project = workspace.projects.firstOrNull { it.id == board?.project_id }
     var settings by remember { mutableStateOf(false) }
     var archived by remember { mutableStateOf(false) }
+    var archiving by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Card?>(null) }
     val ready = selectedBoard == boardId && workspace.loaded
     val lanes = if (ready) view.lanes else emptyList()
@@ -63,10 +65,11 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
                     .joinToString(" · "),
             actions =
                 listOf(
-                    boardMenu(store, board, view, target, session) { action ->
+                    boardMenu(store, board, view, target, session, retired != null) { action ->
                         when (action) {
                             "settings" -> settings = true
                             "archived" -> archived = true
+                            "archive" -> archiving = true
                         }
                     }
                 ),
@@ -134,6 +137,24 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
                 }
             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 when {
+                    retired != null ->
+                        EmptyState(
+                            Glyph.ARCHIVE,
+                            "Board archived",
+                            "Dieter keeps this empty board and its settings.",
+                            Modifier.padding(top = 48.dp),
+                        ) {
+                            DButton(
+                                "Restore board",
+                                {
+                                    store.command(
+                                        Command(admin = AdminCommand(set_board_retired = AdminBoardRetired(boardId, false)))
+                                    )
+                                },
+                                Modifier.testTag("board-restore"),
+                                glyph = Glyph.ARCHIVE,
+                            )
+                        }
                     !ready ->
                         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Spinner(Modifier.size(28.dp))
@@ -171,6 +192,19 @@ internal fun BoardScreen(store: MobileStore, boardId: String) {
     }
     if (settings) BoardSettings(store, boardId) { settings = false }
     if (archived) ArchivedCards(store, boardId) { archived = false }
+    if (archiving)
+        ConfirmDialog(
+            "Archive “${board?.name ?: "Board"}”?",
+            "Only an empty board can be archived: no cards, archived cards included, and no schedules. Dieter " +
+                "keeps it and its settings; the project's page lists it to restore.",
+            "Archive",
+            {
+                store.command(Command(admin = AdminCommand(set_board_retired = AdminBoardRetired(boardId, true))))
+                archiving = false
+            },
+            { archiving = false },
+            destructive = true,
+        )
     editing?.let { card -> CardEditSheet(store, card) { editing = null } }
 }
 
@@ -180,6 +214,7 @@ private fun boardMenu(
     view: BoardViewSlice,
     target: BoardViewTarget,
     session: SessionSlice,
+    retired: Boolean,
     open: (String) -> Unit,
 ): ChromeAction {
     val workspace = store.workspace.slice.value
@@ -265,6 +300,15 @@ private fun boardMenu(
                         },
                     )
                 ),
+                if (retired) null
+                else
+                    MenuSection(
+                        listOf(
+                            ChromeAction("board-archive", "Archive board…", Glyph.ARCHIVE, destructive = true) {
+                                open("archive")
+                            }
+                        )
+                    ),
             ),
     )
 }

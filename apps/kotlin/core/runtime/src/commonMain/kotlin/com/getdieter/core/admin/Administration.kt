@@ -141,6 +141,19 @@ object AdminForms {
 
 data class LabelColor(val name: String, val value: String)
 
+/** Retiring (archiving) a board: the daemon keeps any board that still has cards or schedules. */
+object BoardRetirement {
+    /** Why the daemon kept a board it was asked to retire, in the person's words; null for other failures. */
+    fun refusal(message: String): String? =
+        when {
+            "surviving card" in message ->
+                "Only an empty board can be archived: this one still has cards, archived cards included."
+            "surviving schedule" in message ->
+                "Only an empty board can be archived: a schedule still belongs to this one."
+            else -> null
+        }
+}
+
 object Labels {
     /** The palette every client offers, by name. */
     val COLORS =
