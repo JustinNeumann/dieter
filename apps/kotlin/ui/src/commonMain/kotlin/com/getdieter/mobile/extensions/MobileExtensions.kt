@@ -32,6 +32,8 @@ internal class MobileExtensions(
     val boardRenderer: BoardRenderer? = null,
     /** The host's namer for new tasks and chats sent without a title, while the New task form is open. */
     val conversationNamer: @Composable (MobileStore) -> ConversationNamer? = { null },
+    /** A board order of the host's own; without one, boards keep Dieter's order. */
+    val boardOrder: @Composable (MobileStore) -> BoardOrder? = { null },
 ) {
     fun page(id: String): ExtensionPage? = pages.firstOrNull { it.id == id }
 }
@@ -82,6 +84,18 @@ internal class BoardRenderer(
     /** Whether the host draws [boardId] itself; may change as its data loads. */
     val claims: @Composable (store: MobileStore, boardId: String) -> Boolean,
     val content: @Composable (store: MobileStore, boardId: String) -> Unit,
+)
+
+/**
+ * A board order the host keeps (the add-on: one order for all its devices). Projects shows boards in it, and a
+ * board is dragged into place after a long press.
+ */
+@Immutable
+internal class BoardOrder(
+    /** [boards] in the host's order. */
+    val sorted: (List<com.getdieter.api.v1.Board>) -> List<com.getdieter.api.v1.Board>,
+    /** A project's boards, dragged into this order. */
+    val move: (List<String>) -> Unit,
 )
 
 internal val LocalMobileExtensions = staticCompositionLocalOf { MobileExtensions() }

@@ -3,6 +3,7 @@ package com.getdieter.core.composition
 import com.getdieter.api.v1.MessagePart
 import com.getdieter.core.presentation.ByteSizes
 import okio.ByteString
+import okio.ByteString.Companion.decodeBase64
 
 /**
  * The daemon's attachment limits and naming rules, enforced before anything is queued. Reading file
@@ -67,6 +68,14 @@ object Attachments {
             "ppt" to "application/vnd.ms-powerpoint",
             "pptx" to "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
+
+    /** The attachment's content: its data, else a base64 data URL's; null when it has neither. */
+    fun bytes(part: MessagePart): ByteString? {
+        if (part.data_.size > 0) return part.data_
+        val url = part.url
+        if (!url.startsWith("data:") || !url.substringBefore(',').endsWith(";base64")) return null
+        return url.substringAfter(',', "").decodeBase64()?.takeIf { it.size > 0 }
+    }
 
     /** Bytes the daemon will receive: the data, or the decoded size of a base64 data URL. */
     fun size(part: MessagePart): Long {

@@ -3,6 +3,7 @@
 package com.getdieter.mobile.workspace
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -14,9 +15,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.getdieter.client.v1.*
 import com.getdieter.mobile.admin.*
 import com.getdieter.mobile.app.*
@@ -25,6 +30,7 @@ import com.getdieter.mobile.design.*
 import com.getdieter.mobile.extensions.*
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.store.*
+import kotlin.math.roundToInt
 
 @Composable
 internal fun ProjectsScreen(store: MobileStore) {
@@ -256,8 +262,11 @@ private fun ProjectGroup(store: MobileStore, id: String) {
     val workspace by store.workspace.slice.collectAsState()
     val session by store.session.slice.collectAsState()
     val navigation by store.workspace.navigation.collectAsState()
+    val order = LocalMobileExtensions.current.boardOrder(store)
     val project = workspace.projects.firstOrNull { it.id == id } ?: return
-    val boards = workspace.boards.filter { it.project_id == id }
+    val boards = workspace.boards.filter { it.project_id == id }.let { order?.sorted?.invoke(it) ?: it }
+    val ids = boards.map { it.id }
+    val drag = remember(id) { BoardDrag() }
     val count = boards.size + 1
     val machines =
         project.checkouts
@@ -314,7 +323,8 @@ private fun ProjectGroup(store: MobileStore, id: String) {
             val attention = workspace.board_attention[board.id] ?: 0
             ListRow(
                 board.name,
-                Modifier.testTag("board-row-${board.id}"),
+                Modifier.testTag("board-row-${board.id}")
+                    .then(if (order != null && ids.size > 1) drag.modifier(board.id, ids, order) else Modifier),
                 position = Position.of(index + 1, count),
                 glyph = Glyph.BOARD,
                 glyphTint = labelColor(com.getdieter.core.admin.Labels.stable(board.id)),
@@ -427,6 +437,53 @@ internal fun projectMenu(
     )
 }
 
+/** A board row dragged within its project after a long press: the others make room, the drop reorders. */
+private class BoardDrag {
+    private var dragged by mutableStateOf<String?>(null)
+    private var offset by mutableFloatStateOf(0f)
+    private var rowHeight = 1
+
+    private fun target(ids: List<String>): Int =
+        (ids.indexOf(dragged) + (offset / rowHeight).roundToInt()).coerceIn(0, ids.lastIndex)
+
+    private fun shift(ids: List<String>, id: String): Float {
+        val from = ids.indexOf(dragged).takeIf { it >= 0 } ?: return 0f
+        if (id == dragged) return offset
+        val index = ids.indexOf(id)
+        val to = target(ids)
+        return when (index) {
+            in (from + 1)..to -> -rowHeight.toFloat()
+            in to until from -> rowHeight.toFloat()
+            else -> 0f
+        }
+    }
+
+    fun modifier(id: String, ids: List<String>, order: BoardOrder): Modifier =
+        Modifier.onSizeChanged { if (dragged == null) rowHeight = it.height.coerceAtLeast(1) }
+            .zIndex(if (dragged == id) 1f else 0f)
+            .graphicsLayer { translationY = shift(ids, id) }
+            .pointerInput(id, ids) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        dragged = id
+                        offset = 0f
+                    },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        offset += amount.y
+                    },
+                    onDragCancel = { dragged = null },
+                    onDragEnd = {
+                        val from = ids.indexOf(id)
+                        val to = target(ids)
+                        dragged = null
+                        offset = 0f
+                        if (to != from) order.move(ids.toMutableList().apply { add(to, removeAt(from)) })
+                    },
+                )
+            }
+}
+
 @Composable
 internal fun ProjectScreen(store: MobileStore, projectId: String) {
     val workspace by store.workspace.slice.collectAsState()
@@ -442,7 +499,8 @@ internal fun ProjectScreen(store: MobileStore, projectId: String) {
         }
         return
     }
-    val boards = workspace.boards.filter { it.project_id == projectId }
+    val order = LocalMobileExtensions.current.boardOrder(store)
+    val boards = workspace.boards.filter { it.project_id == projectId }.let { order?.sorted?.invoke(it) ?: it }
     val chrome =
         ScreenChrome(
             project.name,

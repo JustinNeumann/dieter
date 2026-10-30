@@ -127,4 +127,14 @@ class AttachmentsTest {
                 .map(ByteSizes::format),
         )
     }
+
+    @Test
+    fun contentComesFromTheDataOrABase64DataUrl() {
+        val png = byteArrayOf(-119, 80, 78, 71).toByteString()
+        assertEquals(png, Attachments.bytes(MessagePart(data_ = png)))
+        assertEquals(png, Attachments.bytes(MessagePart(url = "data:image/png;base64,iVBORw==")))
+        assertNull(Attachments.bytes(MessagePart(url = "data:text/plain,hello")))
+        assertNull(Attachments.bytes(MessagePart(url = "https://example.invalid/a.png")))
+        assertNull(Attachments.bytes(MessagePart()))
+    }
 }

@@ -22,6 +22,9 @@ import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.store.*
 
+/** A board's remote publish modes, as the board settings and New Board offer them. */
+internal val PUBLISH_MODES = listOf("manual" to "Manual", "push_base" to "Push base", "pull_request" to "Pull request")
+
 @Composable
 internal fun BoardSettings(store: MobileStore, boardId: String, dismiss: () -> Unit) {
     val workspace by store.workspace.slice.collectAsState()
@@ -121,16 +124,8 @@ internal fun BoardSettings(store: MobileStore, boardId: String, dismiss: () -> U
         Group(listOf(0)) { _, position ->
             PickerRow(
                 "Publish",
-                mapOf(
-                    "manual" to "Manual",
-                    "push_base" to "Push base",
-                    "pull_request" to "Pull request",
-                )[publish] ?: publish,
-                listOf(
-                    "manual" to "Manual",
-                    "push_base" to "Push base",
-                    "pull_request" to "Pull request",
-                ),
+                PUBLISH_MODES.toMap()[publish] ?: publish,
+                PUBLISH_MODES,
                 publish,
                 true,
                 position,

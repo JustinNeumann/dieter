@@ -285,6 +285,7 @@ private fun ProjectSettingsSheet(
 private fun NewBoardSheet(store: MobileStore, projectId: String, dismiss: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var review by remember { mutableStateOf(true) }
+    var publish by remember { mutableStateOf("manual") }
     Sheet(
         "New Board",
         dismiss,
@@ -302,6 +303,7 @@ private fun NewBoardSheet(store: MobileStore, projectId: String, dismiss: () -> 
                                                 project_id = projectId,
                                                 name = name,
                                                 workflow = if (review) "review" else "direct",
+                                                publish_mode = publish,
                                             )
                                     )
                             )
@@ -324,13 +326,26 @@ private fun NewBoardSheet(store: MobileStore, projectId: String, dismiss: () -> 
                 singleLine = true,
             )
         }
-        Group(listOf(0)) { _, position ->
-            ListRow(
-                "Review lane",
-                position = position,
-                subtitle = "Cards move to Review before Done",
-                trailing = { DSwitch(review, { review = it }) },
-            )
+        Group(listOf(0, 1)) { row, position ->
+            if (row == 0)
+                ListRow(
+                    "Review lane",
+                    position = position,
+                    subtitle = "Cards move to Review before Done",
+                    trailing = { DSwitch(review, { review = it }) },
+                )
+            else
+                PickerRow(
+                    "Publish",
+                    PUBLISH_MODES.toMap().getValue(publish),
+                    PUBLISH_MODES,
+                    publish,
+                    true,
+                    position,
+                    Glyph.PUSH,
+                ) {
+                    publish = it
+                }
         }
     }
 }

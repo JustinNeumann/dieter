@@ -46,6 +46,7 @@ import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.navigation.*
 import com.getdieter.mobile.platform.*
 import com.getdieter.mobile.store.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -244,6 +245,25 @@ private fun Transcript(
                 )
                 .tool_output
     }
+    val toolImages =
+        remember(selected) {
+            ToolImageLoader { messageId, part ->
+                try {
+                    store.core
+                        .dispatch(
+                            Command(
+                                load_tool_output =
+                                    LoadToolOutput(selected, messageId, part.tool_call_id, part.payload_revision)
+                            )
+                        )
+                        .tool_output
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
     val findClearance = with(LocalDensity.current) { 72.dp.roundToPx() }
     Column(Modifier.fillMaxSize().imePadding()) {
         Box(Modifier.weight(1f)) {
@@ -321,6 +341,7 @@ private fun Transcript(
                         onCopy = {
                             clipboard.setText(AnnotatedString(rowText(row, view)))
                         },
+                        toolImages = toolImages,
                     )
                 }
                 view.conversation
@@ -490,7 +511,7 @@ private fun Transcript(
                 store.command(Command(choose_agent = ChooseAgent(selected, it)))
             }
         }
-    toolOutput?.let { tool -> ToolOutputSheet(tool) { toolOutput = null } }
+    toolOutput?.let { tool -> ToolOutputSheet(tool, preview) { toolOutput = null } }
 }
 
 private fun rowText(row: TimelineItem, view: ConversationSlice) =

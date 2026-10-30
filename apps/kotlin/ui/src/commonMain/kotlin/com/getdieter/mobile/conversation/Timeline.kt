@@ -5,6 +5,7 @@
 
 package com.getdieter.mobile.conversation
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -19,19 +20,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.getdieter.api.v1.MessagePart
 import com.getdieter.api.v1.ToolOutput
 import com.getdieter.client.v1.*
+import com.getdieter.core.composition.Attachments
+import com.getdieter.core.files.FilePaths
+import com.getdieter.core.presentation.ToolImages
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.channels.PeerNoticeCard
 import com.getdieter.mobile.design.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.compose.resources.decodeToImageBitmap
 
 @Composable
 internal fun TimelineRow(
@@ -41,6 +51,7 @@ internal fun TimelineRow(
     onAttachment: (MessagePart) -> Unit,
     onTool: (TimelineStep) -> Unit,
     onCopy: () -> Unit,
+    toolImages: ToolImageLoader? = null,
 ) {
     var expanded by rememberSaveable(row.id) { mutableStateOf(false) }
     if (row.activity && !expanded) {
@@ -90,7 +101,7 @@ internal fun TimelineRow(
                     ActivitySummaryRow(group.summary, open, padded = false) { open = !open }
                 if (!group.activity || open || row.activity)
                     group.steps.forEach { step ->
-                        TimelineStepView(step, row, view, openUrl, onAttachment, onTool)
+                        TimelineStepView(step, row, view, openUrl, onAttachment, onTool, toolImages)
                     }
             }
             view.conversation
@@ -110,12 +121,21 @@ private fun TimelineStepView(
     openUrl: (String) -> Unit,
     onAttachment: (MessagePart) -> Unit,
     onTool: (TimelineStep) -> Unit,
+    toolImages: ToolImageLoader?,
 ) {
     val part =
         view.messages.firstOrNull { it.id == step.message_id }?.parts?.getOrNull(step.part_index)
     val text = step.text.ifEmpty { part?.text.orEmpty() }
     when (step.kind) {
-        TimelineStepKind.TIMELINE_STEP_KIND_TOOL -> ToolRow(step) { onTool(step) }
+        TimelineStepKind.TIMELINE_STEP_KIND_TOOL -> {
+            ToolRow(step) { onTool(step) }
+            if (part != null && toolImages != null && ToolImages.shown(part))
+                toolImages.of(step.message_id, part).forEach { image ->
+                    Picture(image, step.tool_title, Modifier.padding(top = 6.dp), 560.dp, 420.dp) {
+                        onAttachment(image)
+                    }
+                }
+        }
         TimelineStepKind.TIMELINE_STEP_KIND_REASONING ->
             if (text.isNotBlank())
                 Row {
@@ -323,8 +343,72 @@ private fun ToolRow(step: TimelineStep, onClick: () -> Unit) {
     }
 }
 
+/**
+ * The images of tool calls that returned some ([ToolImages.shown]), each loaded once while the conversation is
+ * open; [load] answers null when the output can't be had.
+ */
+@Stable
+internal class ToolImageLoader(private val load: suspend (messageId: String, part: MessagePart) -> ToolOutput?) {
+    private val loaded = mutableStateMapOf<String, List<MessagePart>>()
+
+    @Composable
+    fun of(messageId: String, part: MessagePart): List<MessagePart> {
+        val key = "${part.tool_call_id}@${part.payload_revision}"
+        LaunchedEffect(key) {
+            if (key !in loaded) loaded[key] = load(messageId, part)?.let { ToolImages.find(it.output_json) }.orEmpty()
+        }
+        return loaded[key].orEmpty()
+    }
+}
+
+/** An image part decoded for drawing; [bitmap] is null for one this platform can't draw (SVG, damaged). */
+private class Decoded(val bitmap: ImageBitmap?)
+
+/** [part] decoded, null while that runs; a part that isn't an image decodes to nothing at once. */
+@Composable
+private fun rememberDecoded(part: MessagePart): Decoded? {
+    if (!FilePaths.isImage(part.filename, part.media_type)) return Decoded(null)
+    return produceState<Decoded?>(null, part) {
+        value =
+            Decoded(
+                withContext(Dispatchers.Default) {
+                    Attachments.bytes(part)?.let { runCatching { it.toByteArray().decodeToImageBitmap() }.getOrNull() }
+                }
+            )
+    }.value
+}
+
+/** An image shown as itself, fitted into [maxWidth] × [maxHeight]; nothing while it decodes or when it can't be. */
+@Composable
+private fun Picture(
+    part: MessagePart,
+    description: String,
+    modifier: Modifier,
+    maxWidth: Dp,
+    maxHeight: Dp,
+    onClick: () -> Unit,
+) {
+    val bitmap = rememberDecoded(part)?.bitmap ?: return
+    Image(
+        bitmap,
+        description,
+        modifier
+            .widthIn(max = maxWidth)
+            .heightIn(max = maxHeight)
+            .clip(RoundedCornerShape(14.dp))
+            .pressable(onClick = onClick, highlight = true),
+        contentScale = ContentScale.Fit,
+    )
+}
+
+/** An attachment: an image shows as itself, anything else (or an image that can't be drawn) as a file tile. */
 @Composable
 private fun AttachmentTile(part: MessagePart, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val decoded = rememberDecoded(part) ?: return
+    if (decoded.bitmap != null) {
+        Picture(part, part.filename.ifEmpty { "Image" }, modifier, 280.dp, 280.dp, onClick)
+        return
+    }
     Row(
         modifier
             .widthIn(max = 300.dp)
@@ -366,16 +450,21 @@ private fun AttachmentTile(part: MessagePart, modifier: Modifier = Modifier, onC
 }
 
 @Composable
-internal fun ToolOutputSheet(tool: ToolOutput, onDismiss: () -> Unit) {
+internal fun ToolOutputSheet(tool: ToolOutput, onImage: (MessagePart) -> Unit = {}, onDismiss: () -> Unit) {
+    val images = remember(tool) { ToolImages.find(tool.output_json) }
     Sheet(tool.tool_name.ifEmpty { "Tool" }, onDismiss) {
         Column(
             Modifier.padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(tool.state, style = type.subheadline, color = palette.secondaryLabel)
+            images.forEach { image ->
+                Picture(image, image.filename, Modifier, 560.dp, 420.dp) { onImage(image) }
+            }
             listOf(
                     "Input" to tool.input_json.utf8(),
-                    "Output" to tool.output_json.utf8(),
+                    // images stand above; their base64 shows as a placeholder
+                    "Output" to if (images.isEmpty()) tool.output_json.utf8() else ToolImages.text(tool.output_json),
                     "Error" to tool.error_text,
                 )
                 .filter { it.second.isNotEmpty() }
