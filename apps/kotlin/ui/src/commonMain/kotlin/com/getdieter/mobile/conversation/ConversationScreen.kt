@@ -63,14 +63,25 @@ internal fun ConversationScreen(store: MobileStore, cardId: String, openUrl: (St
     val known = card ?: workspace.cards.firstOrNull { it.id == cardId }
     val chat = known?.scope == "chat"
     val subagents = view.conversation?.subagents.orEmpty()
+    // The lane shows where the card is, so a move from the menu or the composer is seen at once;
+    // the board's copy of the card has the move first.
+    val lane =
+        (workspace.cards.firstOrNull { it.id == cardId } ?: known)?.lane?.let { id ->
+            view.board?.lanes?.firstOrNull { it.id == id }?.name
+        }
     val chrome =
         ScreenChrome(
             known?.title?.ifBlank { null } ?: if (chat) "Chat" else "Conversation",
             subtitle =
-                listOfNotNull(view.project?.name, if (chat) "Chat" else view.board?.name)
+                listOfNotNull(
+                        view.project?.name,
+                        if (chat) "Chat" else view.board?.name,
+                        lane.takeIf { !chat },
+                    )
                     .filter { it.isNotBlank() }
                     .joinToString(" · "),
             actions =
+
                 listOfNotNull(
                     if (!chat)
                         ChromeAction("pane-changes", "Changes", Glyph.CHANGES) {
