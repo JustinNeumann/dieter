@@ -5,6 +5,8 @@ enum class DieterPalette(
     val slug: String,
     val displayName: String,
     val tokens: DieterPaletteTokens,
+    /** A pearlescent palette's sheen, its colors in order; the swatch shows them instead of shellStart → shellEnd. */
+    val sheen: List<Long> = emptyList(),
 ) {
     MONOCHROME(
         "monochrome",
@@ -133,6 +135,24 @@ enum class DieterPalette(
             0xFF190A13,
             0xFF361527,
         ),
+    ),
+    // Night-sky navy with a pearl sheen running cyan, periwinkle, violet, pink and peach, and a golden glow
+    DREAMFALL(
+        "dreamfall",
+        "Dreamfall Pearl",
+        DieterPaletteTokens(
+            0xFF0A0F24,
+            0xFF1F2452,
+            0xFF8E9BFF,
+            0xFF7C5CE0,
+            0xFFF3A9C4,
+            0xFF5CC8F2,
+            0xFFFFC857,
+            0xFFF8F6FC,
+            0xFF0B1330,
+            0xFF151A3D,
+        ),
+        sheen = listOf(0xFF5CC8F2, 0xFF6E9BFF, 0xFFA98BFF, 0xFFE59AD0, 0xFFF6C08A),
     );
 
     companion object {

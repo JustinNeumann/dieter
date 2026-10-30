@@ -371,7 +371,7 @@ private fun PaletteSwatch(
                 .clip(CircleShape)
                 .background(
                     androidx.compose.ui.graphics.Brush.linearGradient(
-                        listOf(Color(tokens.shellStart), Color(tokens.shellEnd))
+                        item.sheen.ifEmpty { listOf(tokens.shellStart, tokens.shellEnd) }.map(::Color)
                     )
                 )
         )

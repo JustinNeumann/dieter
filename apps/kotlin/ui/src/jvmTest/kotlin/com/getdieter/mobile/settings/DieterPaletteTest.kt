@@ -18,10 +18,11 @@ class DieterPaletteTest {
                 "solar-command",
                 "arctic-console",
                 "coral-signal",
+                "dreamfall",
             ),
             DieterPalette.entries.map { it.slug },
         )
-        assertEquals(8, DieterPalette.entries.map { it.displayName }.distinct().size)
+        assertEquals(9, DieterPalette.entries.map { it.displayName }.distinct().size)
     }
 
     @Test
@@ -36,8 +37,8 @@ class DieterPaletteTest {
 
     @Test
     fun everyPaletteHasDistinctBrandAndSurfaceTokens() {
-        assertEquals(8, DieterPalette.entries.map { it.tokens.shellStart }.distinct().size)
-        assertEquals(8, DieterPalette.entries.map { it.tokens.darkBackground }.distinct().size)
+        assertEquals(9, DieterPalette.entries.map { it.tokens.shellStart }.distinct().size)
+        assertEquals(9, DieterPalette.entries.map { it.tokens.darkBackground }.distinct().size)
         DieterPalette.entries.forEach { palette ->
             assertNotEquals(palette.tokens.darkBackground, palette.tokens.darkSurface)
             assertNotEquals(palette.tokens.shellStart, palette.tokens.shellEnd)
