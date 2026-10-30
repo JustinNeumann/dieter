@@ -158,6 +158,8 @@ internal constructor(
     private var refreshedAt: Instant? = null
     private var latestActivity: Conversation? = null
     private var recovery: Job? = null
+    /** The activity has been ahead of the transcript for longer than [ConversationConfig.hedgeDelay]. */
+    private var lagging = false
     internal val updatesPaused: Boolean
         get() = paused
 
@@ -291,6 +293,10 @@ internal constructor(
      */
     private suspend fun recover() {
         delay(config.hedgeDelay)
+        if (needsRead() && !paused) {
+            lagging = true
+            publish()
+        }
         while (needsRead() && !paused) {
             val owner = daemonId ?: return
             sessions.gateways.filterNotNull().first()
@@ -803,6 +809,7 @@ internal constructor(
                 else -> null
             }
         val needsRead = needsRead()
+        if (!needsRead) lagging = false
         settleAwaiting(presented, outboxView)
         mutableView.update {
             it.copy(
@@ -814,7 +821,14 @@ internal constructor(
                         readError == null &&
                         healthError == null &&
                         !paused,
-                syncing = !it.pending && !paused && (needsRead || health?.current == false),
+                // While a turn runs, the activity is ahead of the transcript for a moment at every
+                // event (the stream delivers each watchInterval): no "Refreshing…" for that, only
+                // before the first frame, after an interrupted stream, or once the hedged read starts.
+                syncing =
+                    !it.pending &&
+                        !paused &&
+                        ((needsRead && (!confirmed || interrupted || lagging)) ||
+                            health?.current == false),
                 refreshedAt = refreshedAt,
                 error = healthError ?: readError,
                 awaitingReply = awaiting != null,

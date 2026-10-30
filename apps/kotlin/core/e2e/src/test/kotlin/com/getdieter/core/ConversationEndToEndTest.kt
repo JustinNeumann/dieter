@@ -15,6 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.launch
 import org.junit.AfterClass
 
 /** CONV scenarios against a real daemon running the mock harness. */
@@ -171,6 +172,36 @@ class ConversationEndToEndTest : EndToEnd() {
             reopened.view.value.messages,
             "an up-to-date acknowledgement retains the transcript",
         )
+    }
+
+    @Test
+    fun aRunningTurnDoesNotFlashRefreshingWhileItsStreamKeepsUp() = e2e {
+        val fixture = shared.acquire()
+        // A hedge delay no healthy stream misses: the activity a moment ahead of the transcript at
+        // every event of a turn is no reason to show "Refreshing…".
+        val runtime =
+            runtime(fixture) {
+                it.copy(conversations = ConversationConfig(hedgeDelay = 30.seconds))
+            }
+        runtime.awaitConnected()
+        runtime.awaitLoaded(fixture)
+        val local = chat(runtime, fixture, "first")
+        val session = runtime.openConversation(local.id)
+        session.view.await(30.seconds) { OutboxPolicy.isServerBacked(it.cardId) }
+        session.awaitReplies(1)
+        session.view.await { !it.syncing }
+        val flashes = mutableListOf<String>()
+        val watcher = launch {
+            session.view.collect {
+                if (it.syncing) flashes += "${it.conversation?.status} at ${it.conversation?.last_seq}"
+            }
+        }
+        runtime.onConversation(session) {
+            send(listOf(com.getdieter.api.v1.MessagePart(type = "text", text = "second")))
+        }
+        session.awaitReplies(2)
+        watcher.cancel()
+        assertEquals(emptyList(), flashes, "no Refreshing… while the stream keeps up")
     }
 
     @Test
