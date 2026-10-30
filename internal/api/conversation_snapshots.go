@@ -264,7 +264,7 @@ func (s *Server) conversationSnapshot(cardID string, limit int, before *int32) (
 	if before != nil && *before < 0 {
 		return nil, fault.New(fault.Invalid, "before must be a non-negative integer")
 	}
-	detail, err := s.store.Kanban.CardDetail(cardID)
+	detail, err := s.store.Kanban.ReadCardDetail(cardID)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +449,7 @@ func (s *Server) watchConversation(ctx context.Context, request *dieterv1.WatchC
 			// status change on another card must not clone and re-encode this
 			// conversation's tool-heavy history. Still read all selected-card
 			// detail so project, board, workspace and read-state changes propagate.
-			detail, err := s.store.Kanban.CardDetail(request.GetCardId())
+			detail, err := s.store.Kanban.ReadCardDetail(request.GetCardId())
 			if err != nil {
 				return err
 			}

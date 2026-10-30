@@ -361,7 +361,11 @@ func (s *Store) ListCards(filter CardFilter) ([]model.Card, error) {
 		projectID = project.ID
 	}
 	if filter.Board != "" {
-		board, err := s.ResolveBoard(projectID, filter.Board)
+		resolve := s.ResolveBoard
+		if filter.IncludeArchived {
+			resolve = s.ResolveArchiveBoard
+		}
+		board, err := resolve(projectID, filter.Board)
 		if err != nil {
 			return nil, err
 		}
@@ -788,6 +792,16 @@ func (s *Store) doneCardsEligibleForArchive(now time.Time, activeCards map[strin
 }
 
 func (s *Store) CardDetail(ref string) (model.CardDetail, error) {
+	return s.cardDetail(ref, s.ResolveBoard)
+}
+
+// ReadCardDetail is CardDetail for reading: an archived card can belong to a
+// retired board (fork), which turns and other mutations must not reach.
+func (s *Store) ReadCardDetail(ref string) (model.CardDetail, error) {
+	return s.cardDetail(ref, s.ResolveArchiveBoard)
+}
+
+func (s *Store) cardDetail(ref string, resolveBoard func(projectID, ref string) (model.Board, error)) (model.CardDetail, error) {
 	owner, err := s.ResolveCard(ref)
 	if err != nil {
 		return model.CardDetail{}, err
@@ -806,7 +820,7 @@ func (s *Store) CardDetail(ref string) (model.CardDetail, error) {
 	}
 	board := model.Board{}
 	if card.Scope == model.ConversationScopeBoard {
-		board, err = s.ResolveBoard(project.ID, card.BoardID)
+		board, err = resolveBoard(project.ID, card.BoardID)
 		if err != nil {
 			return model.CardDetail{}, err
 		}

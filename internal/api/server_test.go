@@ -371,6 +371,54 @@ func TestConnectConversationEndToEnd(t *testing.T) {
 	}
 }
 
+// Fork: a board whose cards are all archived can be retired; the cards stay readable.
+func TestRetiredBoardKeepsItsArchivedCardsReadable(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithTimeout(context.Background(), testkit.Budget(30*time.Second))
+	defer cancel()
+	data := testkit.Store(t)
+	client, _ := newConnectTestClient(t, data, newFakeRunner(), isolatedMockCatalog())
+	workspace, err := client.CreateProject(ctx, &dieterv1.CreateProjectRequest{
+		Mode: "open", Path: testkit.CheckoutDir(t), Name: "Connect", BoardName: "Main", Workflow: model.WorkflowReview,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := data.Kanban.CreateBoard(kanban.CreateBoardInput{Project: workspace.GetProject().GetId(), Name: "Old"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	card, err := client.CreateCard(ctx, &dieterv1.CreateConversationRequest{
+		ProjectId: workspace.GetProject().GetId(), BoardId: old.ID, Lane: model.LaneTodo,
+		Title: "Done long ago", Prompt: "Build it", Provider: "mock", Model: "mock", DeferStart: true, WorkspaceMode: model.WorkspaceModeProject,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.ArchiveCard(ctx, &dieterv1.ArchiveCardRequest{CardId: card.GetId(), Archived: true}); err != nil {
+		t.Fatal(err)
+	}
+	old, err = data.Kanban.GetBoard(old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retired, err := client.SetBoardRetired(ctx, &dieterv1.SetBoardRetiredRequest{BoardId: old.ID, Retired: true, ExpectedRevision: old.RetirementRevision, OperationId: "retire-old"})
+	if err != nil || !retired.GetRetired() {
+		t.Fatalf("retire=%#v err=%v", retired, err)
+	}
+	archived, err := client.ListArchivedCards(ctx, &dieterv1.BoardRef{BoardId: old.ID})
+	if err != nil || len(archived.GetCards()) != 1 || archived.GetCards()[0].GetId() != card.GetId() {
+		t.Fatalf("archived=%#v err=%v", archived, err)
+	}
+	detail, err := client.GetCard(ctx, &dieterv1.GetCardRequest{CardId: card.GetId()})
+	if err != nil || detail.GetBoard().GetId() != old.ID {
+		t.Fatalf("detail=%#v err=%v", detail, err)
+	}
+	if _, err := client.GetConversation(ctx, &dieterv1.GetConversationRequest{CardId: card.GetId(), Limit: 30}); err != nil {
+		t.Fatalf("conversation: %v", err)
+	}
+}
+
 func TestPromptConfigurationAPIEndToEnd(t *testing.T) {
 	t.Parallel()
 	data := testkit.Store(t)
