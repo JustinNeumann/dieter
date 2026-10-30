@@ -508,16 +508,29 @@ class AccountProjector {
         }
 
         /**
-         * Every surviving placement and schedule reference to a board, archived ones included
-         * (`boardReferenceIndex`).
+         * Every surviving placement and schedule reference to a board, incomplete ones included
+         * (`boardReferenceIndex`), except items every version of their `archived` record says are
+         * archived: those stay with a retired board (fork: archived cards cannot be deleted or moved,
+         * so they would keep a board forever). An unarchive on any machine, or an archived state that
+         * has not arrived yet, keeps the item live.
          */
         private fun boardReferences(): Map<String, List<String>> {
+            val archived = HashSet<String>()
+            for (key in records.keys("item")) {
+                val record = records[key] ?: continue
+                val (entity, suffix) = splitField(record.id) ?: continue
+                if (suffix != "archived") continue
+                val values = record.versions.filter { !it.deleted }.map { json(it) as? JsonPrimitive }
+                if (values.isNotEmpty() && values.all { it != null && !it.isString && it.booleanOrNull == true })
+                    archived += entity
+            }
             val references = HashMap<String, LinkedHashSet<String>>()
             for ((kind, field) in listOf("item" to "placement", "schedule" to "summary")) {
                 for (key in records.keys(kind).sorted()) {
                     val record = records[key] ?: continue
                     val (entity, suffix) = splitField(record.id) ?: continue
                     if (suffix != field) continue
+                    if (kind == "item" && entity in archived) continue
                     for (version in record.versions) {
                         if (version.deleted) continue
                         val value = json(version) as? JsonObject ?: continue

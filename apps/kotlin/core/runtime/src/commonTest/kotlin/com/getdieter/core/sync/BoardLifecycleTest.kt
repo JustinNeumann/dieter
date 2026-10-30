@@ -130,6 +130,38 @@ class BoardLifecycleTest {
     }
 
     @Test
+    fun archivedCardsStayWithARetiredBoard() {
+        val base = project("p") + checkout("co", "p", "m0") + board("b", "p")
+        val retired = record("board/b.retired", version("true", "a" to 1L))
+        val placed =
+            TestRecords.field("item", "c_1", "placement", """{"boardId":"b","lane":"done"}""")
+        // fork: as the daemon's boardReferenceIndex, an item counts as archived only while every
+        // version of its archived record says so
+        val cases =
+            listOf(
+                "archived" to listOf(TestRecords.field("item", "c_1", "archived", "true")) to false,
+                "unarchived on another machine" to
+                    listOf(
+                        record(
+                            "item/c_1.archived",
+                            version("true", "a" to 2L),
+                            version("false", "b" to 1L),
+                        )
+                    ) to true,
+                "live" to listOf(TestRecords.field("item", "c_1", "archived", "false")) to true,
+                "archived state not arrived" to emptyList<Nothing>() to true,
+            )
+        for ((case, blocked) in cases) {
+            val (name, archived) = case
+            val view = TestRecords.project(replica("m0", base + retired + placed + archived)).directory
+            val board = view.retiredBoards["b"] ?: view.boards.getValue("p").single()
+            assertEquals(!blocked, board.retired, name)
+            assertEquals(blocked, board.retirement_blocked, name)
+            assertEquals(if (blocked) listOf("item/c_1") else emptyList(), board.retirement_references, name)
+        }
+    }
+
+    @Test
     fun aRetirementBlockedByAnItemNamesItAndARevisionOnlyAnObserverHas() {
         val base = project("p") + checkout("co", "p", "m0") + board("b", "p")
         val retired = record("board/b.retired", version("true", "a" to 1L))
