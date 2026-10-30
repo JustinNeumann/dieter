@@ -5,7 +5,10 @@
 // answer. Without an endpoint the questions are declined at once, which tells the agent to ask in
 // plain text instead of hanging the turn.
 //
-// Protocol (JSON): POST {url}            {id, session, input}  registers a question
+// Protocol (JSON): POST {url}            {id, session, input}  registers a question; the host may answer
+//                                        {token}, a secret the worker then sends with every poll
+//                                        (header x-question-token), so only the worker that asked can
+//                                        read the answer, though others may learn the question's id
 //                  GET  {url}/{id}        {done: false} | {done: true, output}
 // where input is the harness questions tool input and output its tool output
 // ({action: "answered" | "partially-answered", answers: {questionId: {optionIds, freeform?}}} or
@@ -65,11 +68,13 @@ export function createQuestionRelay({
     async ask(id, input) {
       if (typeof id !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(id))
         throw new Error("invalid question id");
-      await request("", {
+      const registered = await request("", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, session: sessionId, input }),
       });
+      const token = typeof registered?.token === "string" ? registered.token : "";
+      const poll = token ? { headers: { "x-question-token": token } } : undefined;
       log(`question ${id} waits for the user`);
       let failures = 0;
       while (!signal?.aborted) {
@@ -77,7 +82,7 @@ export function createQuestionRelay({
         if (signal?.aborted) break;
         let state;
         try {
-          state = await request(`/${encodeURIComponent(id)}`);
+          state = await request(`/${encodeURIComponent(id)}`, poll);
           failures = 0;
         } catch (error) {
           if (signal?.aborted) break;
