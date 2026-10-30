@@ -50,6 +50,7 @@ func conversationInput(request *dieterv1.CreateConversationRequest) (engine.Card
 		WorkspaceMode: workspaceMode, WorkspaceBranch: request.GetWorkspaceBranch(),
 		WorkspaceBaseBranch: request.GetWorkspaceBaseBranch(), WorkspaceBaseRemote: request.GetWorkspaceBaseRemote(),
 		RemotePublishMode: request.GetRemotePublishMode(), VaultAccess: request.GetVaultAccess(), MailAccess: request.GetMailAccess(),
+		HomeAssistantAccess: request.GetHomeAssistantAccess(),
 	}, nil
 }
 
@@ -130,14 +131,18 @@ func scheduleInput(request *dieterv1.SaveScheduleRequest) (schedules.Input, erro
 		Effort: value.GetEffort(), ProviderOptions: cloneProtoStringMap(value.GetProviderOptions()), LabelIDs: append([]string(nil), value.GetLabelIds()...),
 		OpenCardPolicy: value.GetOpenCardPolicy(), MisfirePolicy: value.GetMisfirePolicy(),
 		WorkspaceMode: workspaceMode, VaultAccess: value.GetVaultAccess(), MailAccess: value.GetMailAccess(),
+		HomeAssistantAccess: value.GetHomeAssistantAccess(),
 	}, nil
 }
 
 func (s *Server) idempotentConversation(ctx context.Context, request *dieterv1.CreateConversationRequest, scope string) (*dieterv1.Card, error) {
-	if request.GetMailAccess() {
+	if request.GetMailAccess() || request.GetHomeAssistantAccess() {
 		caller, err := s.capabilityCaller(ctx)
 		if err == nil {
-			err = caller.grantMail(true)
+			err = caller.grantMail(request.GetMailAccess())
+		}
+		if err == nil {
+			err = caller.grantHomeAssistant(request.GetHomeAssistantAccess())
 		}
 		if err != nil {
 			return nil, err

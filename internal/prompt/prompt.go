@@ -209,14 +209,17 @@ func ResolveForWorkspace(settings model.Settings, detail model.CardDetail, label
 		return Resolution{}, fmt.Errorf("skill template: %w", err)
 	}
 	skill := render(skillTemplate, variables)
-	vault, mail := "", ""
+	vault, mail, homeAssistant := "", "", ""
 	if detail.Card.VaultAccess {
 		vault = VaultInstructions(cli)
 	}
 	if detail.Card.MailAccess {
 		mail = MailInstructions(cli)
 	}
-	instructions := BindWorkspace(joinSections(context, skill, vault, mail), detail.Project.Path, workspace)
+	if detail.Card.HomeAssistantAccess {
+		homeAssistant = HomeAssistantInstructions
+	}
+	instructions := BindWorkspace(joinSections(context, skill, vault, mail, homeAssistant), detail.Project.Path, workspace)
 	if len(instructions) > MaxRenderedBytes {
 		return Resolution{}, fault.Invalidf("rendered instructions exceed %d KiB", MaxRenderedBytes>>10)
 	}
@@ -233,6 +236,11 @@ func VaultInstructions(cli string) string {
 - Only when a secret must be typed somewhere: DIETER vault get ITEM --field password --reveal. Never repeat secret values in replies, files, commits or logs.
 - Store a new credential without seeing it: DIETER vault add --name NAME [--url URL] [--username USER] --generate`, "DIETER", cli)
 }
+
+// HomeAssistantInstructions are appended outside the configurable templates
+// for conversations created with Home Assistant access.
+const HomeAssistantInstructions = `## Home Assistant
+This conversation may use Home Assistant: hass-cli (Home Assistant core's REST and WebSocket API) and ha-logs (its system log) are signed in for this conversation's turns, e.g. hass-cli state get sensor.x, hass-cli service call light.turn_on --arguments entity_id=light.x, ha-logs --level error --since 1h.`
 
 // MailInstructions are appended outside the configurable templates for
 // conversations created with mail access; cli is the CLI's shell word. They

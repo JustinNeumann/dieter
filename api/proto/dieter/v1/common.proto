@@ -198,6 +198,10 @@ message Card {
   // Owner-local: agent turns of this conversation may send the user mail.
   // Set only at creation; forks and merges never inherit it.
   bool mail_access = 48;
+  // Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  // Owner-local: agent turns of this conversation may use Home Assistant.
+  // Set only at creation; forks and merges never inherit it.
+  bool home_assistant_access = 1001;
 }
 
 message CardOrigin {

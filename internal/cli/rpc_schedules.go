@@ -270,6 +270,7 @@ Options:
 	openCard := set.String("open-card", defaults.GetOpenCardPolicy(), "open-card policy")
 	vaultAccess := set.Bool("vault", defaults.GetVaultAccess(), "cards created by this schedule may use the account vault")
 	mailAccess := set.Bool("mail", defaults.GetMailAccess(), "cards created by this schedule may send the user mail")
+	homeAssistantAccess := set.Bool("home-assistant", defaults.GetHomeAssistantAccess(), "cards created by this schedule may use Home Assistant")
 
 	providerOptions := parameterFlags{}
 	for key, value := range defaults.GetProviderOptions() {
@@ -312,7 +313,7 @@ Options:
 	if err != nil {
 		return err
 	}
-	draft := &dieterv1.ScheduleDraft{CheckoutId: *checkout, ProjectId: projectValue.GetId(), BoardId: boardValue.GetId(), Name: *name, Description: *description, Cron: *expression, Timezone: *timezone, Enabled: *enabled, Action: *action, TitleTemplate: *title, PromptTemplate: promptValue, Provider: *provider, Model: *modelName, Effort: *effort, LabelIds: splitCSV(*labels), OpenCardPolicy: *openCard, MisfirePolicy: "latest", ProviderOptions: map[string]string(providerOptions), WorkspaceMode: *workspaceMode, VaultAccess: *vaultAccess, MailAccess: *mailAccess}
+	draft := &dieterv1.ScheduleDraft{CheckoutId: *checkout, ProjectId: projectValue.GetId(), BoardId: boardValue.GetId(), Name: *name, Description: *description, Cron: *expression, Timezone: *timezone, Enabled: *enabled, Action: *action, TitleTemplate: *title, PromptTemplate: promptValue, Provider: *provider, Model: *modelName, Effort: *effort, LabelIds: splitCSV(*labels), OpenCardPolicy: *openCard, MisfirePolicy: "latest", ProviderOptions: map[string]string(providerOptions), WorkspaceMode: *workspaceMode, VaultAccess: *vaultAccess, MailAccess: *mailAccess, HomeAssistantAccess: *homeAssistantAccess}
 	request := &dieterv1.SaveScheduleRequest{Schedule: draft}
 	var value *dieterv1.Schedule
 	if updating {

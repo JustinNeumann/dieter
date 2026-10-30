@@ -249,9 +249,12 @@ type Card struct {
 	VaultAccess bool `json:"vaultAccess,omitempty" yaml:"vault_access,omitempty"`
 	// MailAccess is owner-local and fixed at creation: agent turns of this
 	// conversation may send the user mail.
-	MailAccess  bool                `json:"mailAccess,omitempty" yaml:"mail_access,omitempty"`
-	Workspace   *WorkspaceSummary   `json:"workspace,omitempty" yaml:"-"`
-	PullRequest *PullRequestSummary `json:"pullRequest,omitempty" yaml:"-"`
+	MailAccess bool `json:"mailAccess,omitempty" yaml:"mail_access,omitempty"`
+	// HomeAssistantAccess is owner-local and fixed at creation: agent turns of
+	// this conversation may use Home Assistant (the add-on checks the turn).
+	HomeAssistantAccess bool                `json:"homeAssistantAccess,omitempty" yaml:"home_assistant_access,omitempty"`
+	Workspace           *WorkspaceSummary   `json:"workspace,omitempty" yaml:"-"`
+	PullRequest         *PullRequestSummary `json:"pullRequest,omitempty" yaml:"-"`
 }
 
 // Workspace is the durable execution location for either a board card or a
@@ -514,29 +517,30 @@ type Settings struct {
 }
 
 type Schedule struct {
-	OwnerDaemonID   string            `json:"ownerDaemonId" yaml:"owner_daemon_id"`
-	CheckoutID      string            `json:"checkoutId" yaml:"checkout_id"`
-	ID              string            `json:"id" yaml:"id"`
-	ProjectID       string            `json:"projectId" yaml:"project_id"`
-	BoardID         string            `json:"boardId" yaml:"board_id"`
-	Name            string            `json:"name" yaml:"name"`
-	Description     string            `json:"description,omitempty" yaml:"description,omitempty"`
-	Cron            string            `json:"cron" yaml:"cron"`
-	Timezone        string            `json:"timezone" yaml:"timezone"`
-	Enabled         bool              `json:"enabled" yaml:"enabled"`
-	Action          string            `json:"action" yaml:"action"`
-	TitleTemplate   string            `json:"titleTemplate" yaml:"title_template"`
-	PromptTemplate  string            `json:"promptTemplate" yaml:"-"`
-	Provider        string            `json:"provider" yaml:"provider"`
-	Model           string            `json:"model" yaml:"model"`
-	Effort          string            `json:"effort,omitempty" yaml:"effort,omitempty"`
-	ProviderOptions map[string]string `json:"providerOptions,omitempty" yaml:"provider_options,omitempty"`
-	WorkspaceMode   string            `json:"workspaceMode" yaml:"workspace_mode"`
-	VaultAccess     bool              `json:"vaultAccess,omitempty" yaml:"vault_access,omitempty"`
-	MailAccess      bool              `json:"mailAccess,omitempty" yaml:"mail_access,omitempty"`
-	LabelIDs        []string          `json:"labelIds,omitempty" yaml:"labels,omitempty"`
-	OpenCardPolicy  string            `json:"openCardPolicy" yaml:"open_card_policy"`
-	MisfirePolicy   string            `json:"misfirePolicy" yaml:"misfire_policy"`
+	OwnerDaemonID       string            `json:"ownerDaemonId" yaml:"owner_daemon_id"`
+	CheckoutID          string            `json:"checkoutId" yaml:"checkout_id"`
+	ID                  string            `json:"id" yaml:"id"`
+	ProjectID           string            `json:"projectId" yaml:"project_id"`
+	BoardID             string            `json:"boardId" yaml:"board_id"`
+	Name                string            `json:"name" yaml:"name"`
+	Description         string            `json:"description,omitempty" yaml:"description,omitempty"`
+	Cron                string            `json:"cron" yaml:"cron"`
+	Timezone            string            `json:"timezone" yaml:"timezone"`
+	Enabled             bool              `json:"enabled" yaml:"enabled"`
+	Action              string            `json:"action" yaml:"action"`
+	TitleTemplate       string            `json:"titleTemplate" yaml:"title_template"`
+	PromptTemplate      string            `json:"promptTemplate" yaml:"-"`
+	Provider            string            `json:"provider" yaml:"provider"`
+	Model               string            `json:"model" yaml:"model"`
+	Effort              string            `json:"effort,omitempty" yaml:"effort,omitempty"`
+	ProviderOptions     map[string]string `json:"providerOptions,omitempty" yaml:"provider_options,omitempty"`
+	WorkspaceMode       string            `json:"workspaceMode" yaml:"workspace_mode"`
+	VaultAccess         bool              `json:"vaultAccess,omitempty" yaml:"vault_access,omitempty"`
+	MailAccess          bool              `json:"mailAccess,omitempty" yaml:"mail_access,omitempty"`
+	HomeAssistantAccess bool              `json:"homeAssistantAccess,omitempty" yaml:"home_assistant_access,omitempty"`
+	LabelIDs            []string          `json:"labelIds,omitempty" yaml:"labels,omitempty"`
+	OpenCardPolicy      string            `json:"openCardPolicy" yaml:"open_card_policy"`
+	MisfirePolicy       string            `json:"misfirePolicy" yaml:"misfire_policy"`
 
 	NextRunAt string   `json:"nextRunAt,omitempty" yaml:"next_run_at,omitempty"`
 	LastRunAt string   `json:"lastRunAt,omitempty" yaml:"last_run_at,omitempty"`

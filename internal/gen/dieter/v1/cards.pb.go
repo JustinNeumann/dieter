@@ -22,6 +22,82 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type TurnCaller struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	CardId              string                 `protobuf:"bytes,1,opt,name=card_id,json=cardId,proto3" json:"card_id,omitempty"`
+	ProjectId           string                 `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	VaultAccess         bool                   `protobuf:"varint,3,opt,name=vault_access,json=vaultAccess,proto3" json:"vault_access,omitempty"`
+	MailAccess          bool                   `protobuf:"varint,4,opt,name=mail_access,json=mailAccess,proto3" json:"mail_access,omitempty"`
+	HomeAssistantAccess bool                   `protobuf:"varint,5,opt,name=home_assistant_access,json=homeAssistantAccess,proto3" json:"home_assistant_access,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *TurnCaller) Reset() {
+	*x = TurnCaller{}
+	mi := &file_dieter_v1_cards_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TurnCaller) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TurnCaller) ProtoMessage() {}
+
+func (x *TurnCaller) ProtoReflect() protoreflect.Message {
+	mi := &file_dieter_v1_cards_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TurnCaller.ProtoReflect.Descriptor instead.
+func (*TurnCaller) Descriptor() ([]byte, []int) {
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *TurnCaller) GetCardId() string {
+	if x != nil {
+		return x.CardId
+	}
+	return ""
+}
+
+func (x *TurnCaller) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *TurnCaller) GetVaultAccess() bool {
+	if x != nil {
+		return x.VaultAccess
+	}
+	return false
+}
+
+func (x *TurnCaller) GetMailAccess() bool {
+	if x != nil {
+		return x.MailAccess
+	}
+	return false
+}
+
+func (x *TurnCaller) GetHomeAssistantAccess() bool {
+	if x != nil {
+		return x.HomeAssistantAccess
+	}
+	return false
+}
+
 type CardsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Cards         []*Card                `protobuf:"bytes,1,rep,name=cards,proto3" json:"cards,omitempty"`
@@ -31,7 +107,7 @@ type CardsResponse struct {
 
 func (x *CardsResponse) Reset() {
 	*x = CardsResponse{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[0]
+	mi := &file_dieter_v1_cards_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -43,7 +119,7 @@ func (x *CardsResponse) String() string {
 func (*CardsResponse) ProtoMessage() {}
 
 func (x *CardsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[0]
+	mi := &file_dieter_v1_cards_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -56,7 +132,7 @@ func (x *CardsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CardsResponse.ProtoReflect.Descriptor instead.
 func (*CardsResponse) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{0}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CardsResponse) GetCards() []*Card {
@@ -95,14 +171,18 @@ type CreateConversationRequest struct {
 	VaultAccess bool `protobuf:"varint,25,opt,name=vault_access,json=vaultAccess,proto3" json:"vault_access,omitempty"`
 	// Let this conversation's agent turns send the user mail (MailService).
 	// An agent turn may grant it only when its own conversation has it.
-	MailAccess    bool `protobuf:"varint,26,opt,name=mail_access,json=mailAccess,proto3" json:"mail_access,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	MailAccess bool `protobuf:"varint,26,opt,name=mail_access,json=mailAccess,proto3" json:"mail_access,omitempty"`
+	// Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+	// Let this conversation's agent turns use Home Assistant (the add-on's hass-cli).
+	// An agent turn may grant it only when its own conversation has it.
+	HomeAssistantAccess bool `protobuf:"varint,1001,opt,name=home_assistant_access,json=homeAssistantAccess,proto3" json:"home_assistant_access,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateConversationRequest) Reset() {
 	*x = CreateConversationRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[1]
+	mi := &file_dieter_v1_cards_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -114,7 +194,7 @@ func (x *CreateConversationRequest) String() string {
 func (*CreateConversationRequest) ProtoMessage() {}
 
 func (x *CreateConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[1]
+	mi := &file_dieter_v1_cards_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -127,7 +207,7 @@ func (x *CreateConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConversationRequest.ProtoReflect.Descriptor instead.
 func (*CreateConversationRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{1}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateConversationRequest) GetCheckoutId() string {
@@ -291,6 +371,13 @@ func (x *CreateConversationRequest) GetMailAccess() bool {
 	return false
 }
 
+func (x *CreateConversationRequest) GetHomeAssistantAccess() bool {
+	if x != nil {
+		return x.HomeAssistantAccess
+	}
+	return false
+}
+
 type ListChatsRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	IncludeArchived bool                   `protobuf:"varint,1,opt,name=include_archived,json=includeArchived,proto3" json:"include_archived,omitempty"`
@@ -300,7 +387,7 @@ type ListChatsRequest struct {
 
 func (x *ListChatsRequest) Reset() {
 	*x = ListChatsRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[2]
+	mi := &file_dieter_v1_cards_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -312,7 +399,7 @@ func (x *ListChatsRequest) String() string {
 func (*ListChatsRequest) ProtoMessage() {}
 
 func (x *ListChatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[2]
+	mi := &file_dieter_v1_cards_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -325,7 +412,7 @@ func (x *ListChatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChatsRequest.ProtoReflect.Descriptor instead.
 func (*ListChatsRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{2}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListChatsRequest) GetIncludeArchived() bool {
@@ -346,7 +433,7 @@ type ForkChatRequest struct {
 
 func (x *ForkChatRequest) Reset() {
 	*x = ForkChatRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[3]
+	mi := &file_dieter_v1_cards_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +445,7 @@ func (x *ForkChatRequest) String() string {
 func (*ForkChatRequest) ProtoMessage() {}
 
 func (x *ForkChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[3]
+	mi := &file_dieter_v1_cards_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +458,7 @@ func (x *ForkChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForkChatRequest.ProtoReflect.Descriptor instead.
 func (*ForkChatRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{3}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ForkChatRequest) GetSourceCardId() string {
@@ -405,7 +492,7 @@ type ChatsResponse struct {
 
 func (x *ChatsResponse) Reset() {
 	*x = ChatsResponse{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[4]
+	mi := &file_dieter_v1_cards_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -417,7 +504,7 @@ func (x *ChatsResponse) String() string {
 func (*ChatsResponse) ProtoMessage() {}
 
 func (x *ChatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[4]
+	mi := &file_dieter_v1_cards_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -430,7 +517,7 @@ func (x *ChatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatsResponse.ProtoReflect.Descriptor instead.
 func (*ChatsResponse) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{4}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ChatsResponse) GetProjects() []*Project {
@@ -456,7 +543,7 @@ type GetCardRequest struct {
 
 func (x *GetCardRequest) Reset() {
 	*x = GetCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[5]
+	mi := &file_dieter_v1_cards_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +555,7 @@ func (x *GetCardRequest) String() string {
 func (*GetCardRequest) ProtoMessage() {}
 
 func (x *GetCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[5]
+	mi := &file_dieter_v1_cards_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -481,7 +568,7 @@ func (x *GetCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCardRequest.ProtoReflect.Descriptor instead.
 func (*GetCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{5}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *GetCardRequest) GetCardId() string {
@@ -504,7 +591,7 @@ type MoveCardRequest struct {
 
 func (x *MoveCardRequest) Reset() {
 	*x = MoveCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[6]
+	mi := &file_dieter_v1_cards_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -516,7 +603,7 @@ func (x *MoveCardRequest) String() string {
 func (*MoveCardRequest) ProtoMessage() {}
 
 func (x *MoveCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[6]
+	mi := &file_dieter_v1_cards_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -529,7 +616,7 @@ func (x *MoveCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MoveCardRequest.ProtoReflect.Descriptor instead.
 func (*MoveCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{6}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *MoveCardRequest) GetCardId() string {
@@ -578,7 +665,7 @@ type StartCardRequest struct {
 
 func (x *StartCardRequest) Reset() {
 	*x = StartCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[7]
+	mi := &file_dieter_v1_cards_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -590,7 +677,7 @@ func (x *StartCardRequest) String() string {
 func (*StartCardRequest) ProtoMessage() {}
 
 func (x *StartCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[7]
+	mi := &file_dieter_v1_cards_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -603,7 +690,7 @@ func (x *StartCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartCardRequest.ProtoReflect.Descriptor instead.
 func (*StartCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{7}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StartCardRequest) GetCardId() string {
@@ -640,7 +727,7 @@ type StartCardResponse struct {
 
 func (x *StartCardResponse) Reset() {
 	*x = StartCardResponse{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[8]
+	mi := &file_dieter_v1_cards_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -652,7 +739,7 @@ func (x *StartCardResponse) String() string {
 func (*StartCardResponse) ProtoMessage() {}
 
 func (x *StartCardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[8]
+	mi := &file_dieter_v1_cards_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -665,7 +752,7 @@ func (x *StartCardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartCardResponse.ProtoReflect.Descriptor instead.
 func (*StartCardResponse) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{8}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StartCardResponse) GetCard() *Card {
@@ -713,7 +800,7 @@ type SetCardLabelsRequest struct {
 
 func (x *SetCardLabelsRequest) Reset() {
 	*x = SetCardLabelsRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[9]
+	mi := &file_dieter_v1_cards_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -725,7 +812,7 @@ func (x *SetCardLabelsRequest) String() string {
 func (*SetCardLabelsRequest) ProtoMessage() {}
 
 func (x *SetCardLabelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[9]
+	mi := &file_dieter_v1_cards_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -738,7 +825,7 @@ func (x *SetCardLabelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetCardLabelsRequest.ProtoReflect.Descriptor instead.
 func (*SetCardLabelsRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{9}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *SetCardLabelsRequest) GetCardId() string {
@@ -765,7 +852,7 @@ type RenameCardRequest struct {
 
 func (x *RenameCardRequest) Reset() {
 	*x = RenameCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[10]
+	mi := &file_dieter_v1_cards_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +864,7 @@ func (x *RenameCardRequest) String() string {
 func (*RenameCardRequest) ProtoMessage() {}
 
 func (x *RenameCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[10]
+	mi := &file_dieter_v1_cards_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,7 +877,7 @@ func (x *RenameCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenameCardRequest.ProtoReflect.Descriptor instead.
 func (*RenameCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{10}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *RenameCardRequest) GetCardId() string {
@@ -817,7 +904,7 @@ type MergeCardRequest struct {
 
 func (x *MergeCardRequest) Reset() {
 	*x = MergeCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[11]
+	mi := &file_dieter_v1_cards_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -829,7 +916,7 @@ func (x *MergeCardRequest) String() string {
 func (*MergeCardRequest) ProtoMessage() {}
 
 func (x *MergeCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[11]
+	mi := &file_dieter_v1_cards_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -842,7 +929,7 @@ func (x *MergeCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeCardRequest.ProtoReflect.Descriptor instead.
 func (*MergeCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{11}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *MergeCardRequest) GetCardId() string {
@@ -871,7 +958,7 @@ type DraftAgentSettings struct {
 
 func (x *DraftAgentSettings) Reset() {
 	*x = DraftAgentSettings{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[12]
+	mi := &file_dieter_v1_cards_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -883,7 +970,7 @@ func (x *DraftAgentSettings) String() string {
 func (*DraftAgentSettings) ProtoMessage() {}
 
 func (x *DraftAgentSettings) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[12]
+	mi := &file_dieter_v1_cards_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -896,7 +983,7 @@ func (x *DraftAgentSettings) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DraftAgentSettings.ProtoReflect.Descriptor instead.
 func (*DraftAgentSettings) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{12}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *DraftAgentSettings) GetProvider() string {
@@ -939,7 +1026,7 @@ type UpdateCardRequest struct {
 
 func (x *UpdateCardRequest) Reset() {
 	*x = UpdateCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[13]
+	mi := &file_dieter_v1_cards_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -951,7 +1038,7 @@ func (x *UpdateCardRequest) String() string {
 func (*UpdateCardRequest) ProtoMessage() {}
 
 func (x *UpdateCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[13]
+	mi := &file_dieter_v1_cards_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -964,7 +1051,7 @@ func (x *UpdateCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCardRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{13}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *UpdateCardRequest) GetCardId() string {
@@ -1005,7 +1092,7 @@ type ArchiveCardRequest struct {
 
 func (x *ArchiveCardRequest) Reset() {
 	*x = ArchiveCardRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[14]
+	mi := &file_dieter_v1_cards_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1017,7 +1104,7 @@ func (x *ArchiveCardRequest) String() string {
 func (*ArchiveCardRequest) ProtoMessage() {}
 
 func (x *ArchiveCardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[14]
+	mi := &file_dieter_v1_cards_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1030,7 +1117,7 @@ func (x *ArchiveCardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveCardRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveCardRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{14}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ArchiveCardRequest) GetCardId() string {
@@ -1057,7 +1144,7 @@ type PinChatRequest struct {
 
 func (x *PinChatRequest) Reset() {
 	*x = PinChatRequest{}
-	mi := &file_dieter_v1_cards_proto_msgTypes[15]
+	mi := &file_dieter_v1_cards_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1069,7 +1156,7 @@ func (x *PinChatRequest) String() string {
 func (*PinChatRequest) ProtoMessage() {}
 
 func (x *PinChatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dieter_v1_cards_proto_msgTypes[15]
+	mi := &file_dieter_v1_cards_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1082,7 +1169,7 @@ func (x *PinChatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinChatRequest.ProtoReflect.Descriptor instead.
 func (*PinChatRequest) Descriptor() ([]byte, []int) {
-	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{15}
+	return file_dieter_v1_cards_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PinChatRequest) GetCardId() string {
@@ -1103,9 +1190,18 @@ var File_dieter_v1_cards_proto protoreflect.FileDescriptor
 
 const file_dieter_v1_cards_proto_rawDesc = "" +
 	"\n" +
-	"\x15dieter/v1/cards.proto\x12\tdieter.v1\x1a\x16dieter/v1/common.proto\x1a\x1bgoogle/protobuf/empty.proto\"6\n" +
+	"\x15dieter/v1/cards.proto\x12\tdieter.v1\x1a\x16dieter/v1/common.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xbc\x01\n" +
+	"\n" +
+	"TurnCaller\x12\x17\n" +
+	"\acard_id\x18\x01 \x01(\tR\x06cardId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x02 \x01(\tR\tprojectId\x12!\n" +
+	"\fvault_access\x18\x03 \x01(\bR\vvaultAccess\x12\x1f\n" +
+	"\vmail_access\x18\x04 \x01(\bR\n" +
+	"mailAccess\x122\n" +
+	"\x15home_assistant_access\x18\x05 \x01(\bR\x13homeAssistantAccess\"6\n" +
 	"\rCardsResponse\x12%\n" +
-	"\x05cards\x18\x01 \x03(\v2\x0f.dieter.v1.CardR\x05cards\"\xbe\a\n" +
+	"\x05cards\x18\x01 \x03(\v2\x0f.dieter.v1.CardR\x05cards\"\xf3\a\n" +
 	"\x19CreateConversationRequest\x12\x1f\n" +
 	"\vcheckout_id\x18\x18 \x01(\tR\n" +
 	"checkoutId\x12\x1d\n" +
@@ -1135,7 +1231,8 @@ const file_dieter_v1_cards_proto_rawDesc = "" +
 	"\x13remote_publish_mode\x18\x14 \x01(\tR\x11remotePublishMode\x12!\n" +
 	"\fvault_access\x18\x19 \x01(\bR\vvaultAccess\x12\x1f\n" +
 	"\vmail_access\x18\x1a \x01(\bR\n" +
-	"mailAccess\x1aB\n" +
+	"mailAccess\x123\n" +
+	"\x15home_assistant_access\x18\xe9\a \x01(\bR\x13homeAssistantAccess\x1aB\n" +
 	"\x14ProviderOptionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"=\n" +
@@ -1196,7 +1293,7 @@ const file_dieter_v1_cards_proto_rawDesc = "" +
 	"\barchived\x18\x02 \x01(\bR\barchived\"A\n" +
 	"\x0ePinChatRequest\x12\x17\n" +
 	"\acard_id\x18\x01 \x01(\tR\x06cardId\x12\x16\n" +
-	"\x06pinned\x18\x02 \x01(\bR\x06pinned2\xc5\a\n" +
+	"\x06pinned\x18\x02 \x01(\bR\x06pinned2\x85\b\n" +
 	"\vCardService\x12B\n" +
 	"\x11ListArchivedCards\x12\x13.dieter.v1.BoardRef\x1a\x18.dieter.v1.CardsResponse\x12C\n" +
 	"\n" +
@@ -1217,7 +1314,8 @@ const file_dieter_v1_cards_proto_rawDesc = "" +
 	"\n" +
 	"UpdateCard\x12\x1c.dieter.v1.UpdateCardRequest\x1a\x0f.dieter.v1.Card\x12=\n" +
 	"\vArchiveCard\x12\x1d.dieter.v1.ArchiveCardRequest\x1a\x0f.dieter.v1.Card\x125\n" +
-	"\aPinChat\x12\x19.dieter.v1.PinChatRequest\x1a\x0f.dieter.v1.CardBR\n" +
+	"\aPinChat\x12\x19.dieter.v1.PinChatRequest\x1a\x0f.dieter.v1.Card\x12>\n" +
+	"\rGetTurnCaller\x12\x16.google.protobuf.Empty\x1a\x15.dieter.v1.TurnCallerBR\n" +
 	"\x14com.getdieter.api.v1P\x01Z8github.com/dbpprt/dieter/internal/gen/dieter/v1;dieterv1b\x06proto3"
 
 var (
@@ -1232,74 +1330,77 @@ func file_dieter_v1_cards_proto_rawDescGZIP() []byte {
 	return file_dieter_v1_cards_proto_rawDescData
 }
 
-var file_dieter_v1_cards_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_dieter_v1_cards_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_dieter_v1_cards_proto_goTypes = []any{
-	(*CardsResponse)(nil),             // 0: dieter.v1.CardsResponse
-	(*CreateConversationRequest)(nil), // 1: dieter.v1.CreateConversationRequest
-	(*ListChatsRequest)(nil),          // 2: dieter.v1.ListChatsRequest
-	(*ForkChatRequest)(nil),           // 3: dieter.v1.ForkChatRequest
-	(*ChatsResponse)(nil),             // 4: dieter.v1.ChatsResponse
-	(*GetCardRequest)(nil),            // 5: dieter.v1.GetCardRequest
-	(*MoveCardRequest)(nil),           // 6: dieter.v1.MoveCardRequest
-	(*StartCardRequest)(nil),          // 7: dieter.v1.StartCardRequest
-	(*StartCardResponse)(nil),         // 8: dieter.v1.StartCardResponse
-	(*SetCardLabelsRequest)(nil),      // 9: dieter.v1.SetCardLabelsRequest
-	(*RenameCardRequest)(nil),         // 10: dieter.v1.RenameCardRequest
-	(*MergeCardRequest)(nil),          // 11: dieter.v1.MergeCardRequest
-	(*DraftAgentSettings)(nil),        // 12: dieter.v1.DraftAgentSettings
-	(*UpdateCardRequest)(nil),         // 13: dieter.v1.UpdateCardRequest
-	(*ArchiveCardRequest)(nil),        // 14: dieter.v1.ArchiveCardRequest
-	(*PinChatRequest)(nil),            // 15: dieter.v1.PinChatRequest
-	nil,                               // 16: dieter.v1.CreateConversationRequest.ProviderOptionsEntry
-	nil,                               // 17: dieter.v1.DraftAgentSettings.ProviderOptionsEntry
-	(*Card)(nil),                      // 18: dieter.v1.Card
-	(*MessagePart)(nil),               // 19: dieter.v1.MessagePart
-	(*Project)(nil),                   // 20: dieter.v1.Project
-	(*BoardRef)(nil),                  // 21: dieter.v1.BoardRef
-	(*CardDetail)(nil),                // 22: dieter.v1.CardDetail
+	(*TurnCaller)(nil),                // 0: dieter.v1.TurnCaller
+	(*CardsResponse)(nil),             // 1: dieter.v1.CardsResponse
+	(*CreateConversationRequest)(nil), // 2: dieter.v1.CreateConversationRequest
+	(*ListChatsRequest)(nil),          // 3: dieter.v1.ListChatsRequest
+	(*ForkChatRequest)(nil),           // 4: dieter.v1.ForkChatRequest
+	(*ChatsResponse)(nil),             // 5: dieter.v1.ChatsResponse
+	(*GetCardRequest)(nil),            // 6: dieter.v1.GetCardRequest
+	(*MoveCardRequest)(nil),           // 7: dieter.v1.MoveCardRequest
+	(*StartCardRequest)(nil),          // 8: dieter.v1.StartCardRequest
+	(*StartCardResponse)(nil),         // 9: dieter.v1.StartCardResponse
+	(*SetCardLabelsRequest)(nil),      // 10: dieter.v1.SetCardLabelsRequest
+	(*RenameCardRequest)(nil),         // 11: dieter.v1.RenameCardRequest
+	(*MergeCardRequest)(nil),          // 12: dieter.v1.MergeCardRequest
+	(*DraftAgentSettings)(nil),        // 13: dieter.v1.DraftAgentSettings
+	(*UpdateCardRequest)(nil),         // 14: dieter.v1.UpdateCardRequest
+	(*ArchiveCardRequest)(nil),        // 15: dieter.v1.ArchiveCardRequest
+	(*PinChatRequest)(nil),            // 16: dieter.v1.PinChatRequest
+	nil,                               // 17: dieter.v1.CreateConversationRequest.ProviderOptionsEntry
+	nil,                               // 18: dieter.v1.DraftAgentSettings.ProviderOptionsEntry
+	(*Card)(nil),                      // 19: dieter.v1.Card
+	(*MessagePart)(nil),               // 20: dieter.v1.MessagePart
+	(*Project)(nil),                   // 21: dieter.v1.Project
+	(*BoardRef)(nil),                  // 22: dieter.v1.BoardRef
 	(*emptypb.Empty)(nil),             // 23: google.protobuf.Empty
+	(*CardDetail)(nil),                // 24: dieter.v1.CardDetail
 }
 var file_dieter_v1_cards_proto_depIdxs = []int32{
-	18, // 0: dieter.v1.CardsResponse.cards:type_name -> dieter.v1.Card
-	16, // 1: dieter.v1.CreateConversationRequest.provider_options:type_name -> dieter.v1.CreateConversationRequest.ProviderOptionsEntry
-	19, // 2: dieter.v1.CreateConversationRequest.attachments:type_name -> dieter.v1.MessagePart
-	20, // 3: dieter.v1.ChatsResponse.projects:type_name -> dieter.v1.Project
-	18, // 4: dieter.v1.ChatsResponse.chats:type_name -> dieter.v1.Card
-	18, // 5: dieter.v1.StartCardResponse.card:type_name -> dieter.v1.Card
-	17, // 6: dieter.v1.DraftAgentSettings.provider_options:type_name -> dieter.v1.DraftAgentSettings.ProviderOptionsEntry
-	12, // 7: dieter.v1.UpdateCardRequest.agent_settings:type_name -> dieter.v1.DraftAgentSettings
-	21, // 8: dieter.v1.CardService.ListArchivedCards:input_type -> dieter.v1.BoardRef
-	1,  // 9: dieter.v1.CardService.CreateCard:input_type -> dieter.v1.CreateConversationRequest
-	1,  // 10: dieter.v1.CardService.CreateChat:input_type -> dieter.v1.CreateConversationRequest
-	3,  // 11: dieter.v1.CardService.ForkChat:input_type -> dieter.v1.ForkChatRequest
-	2,  // 12: dieter.v1.CardService.ListChats:input_type -> dieter.v1.ListChatsRequest
-	5,  // 13: dieter.v1.CardService.GetCard:input_type -> dieter.v1.GetCardRequest
-	6,  // 14: dieter.v1.CardService.MoveCard:input_type -> dieter.v1.MoveCardRequest
-	11, // 15: dieter.v1.CardService.MergeCard:input_type -> dieter.v1.MergeCardRequest
-	7,  // 16: dieter.v1.CardService.StartCard:input_type -> dieter.v1.StartCardRequest
-	9,  // 17: dieter.v1.CardService.SetCardLabels:input_type -> dieter.v1.SetCardLabelsRequest
-	5,  // 18: dieter.v1.CardService.CancelCard:input_type -> dieter.v1.GetCardRequest
-	10, // 19: dieter.v1.CardService.RenameCard:input_type -> dieter.v1.RenameCardRequest
-	13, // 20: dieter.v1.CardService.UpdateCard:input_type -> dieter.v1.UpdateCardRequest
-	14, // 21: dieter.v1.CardService.ArchiveCard:input_type -> dieter.v1.ArchiveCardRequest
-	15, // 22: dieter.v1.CardService.PinChat:input_type -> dieter.v1.PinChatRequest
-	0,  // 23: dieter.v1.CardService.ListArchivedCards:output_type -> dieter.v1.CardsResponse
-	18, // 24: dieter.v1.CardService.CreateCard:output_type -> dieter.v1.Card
-	18, // 25: dieter.v1.CardService.CreateChat:output_type -> dieter.v1.Card
-	18, // 26: dieter.v1.CardService.ForkChat:output_type -> dieter.v1.Card
-	4,  // 27: dieter.v1.CardService.ListChats:output_type -> dieter.v1.ChatsResponse
-	22, // 28: dieter.v1.CardService.GetCard:output_type -> dieter.v1.CardDetail
-	18, // 29: dieter.v1.CardService.MoveCard:output_type -> dieter.v1.Card
-	18, // 30: dieter.v1.CardService.MergeCard:output_type -> dieter.v1.Card
-	8,  // 31: dieter.v1.CardService.StartCard:output_type -> dieter.v1.StartCardResponse
-	18, // 32: dieter.v1.CardService.SetCardLabels:output_type -> dieter.v1.Card
-	23, // 33: dieter.v1.CardService.CancelCard:output_type -> google.protobuf.Empty
-	18, // 34: dieter.v1.CardService.RenameCard:output_type -> dieter.v1.Card
-	18, // 35: dieter.v1.CardService.UpdateCard:output_type -> dieter.v1.Card
-	18, // 36: dieter.v1.CardService.ArchiveCard:output_type -> dieter.v1.Card
-	18, // 37: dieter.v1.CardService.PinChat:output_type -> dieter.v1.Card
-	23, // [23:38] is the sub-list for method output_type
-	8,  // [8:23] is the sub-list for method input_type
+	19, // 0: dieter.v1.CardsResponse.cards:type_name -> dieter.v1.Card
+	17, // 1: dieter.v1.CreateConversationRequest.provider_options:type_name -> dieter.v1.CreateConversationRequest.ProviderOptionsEntry
+	20, // 2: dieter.v1.CreateConversationRequest.attachments:type_name -> dieter.v1.MessagePart
+	21, // 3: dieter.v1.ChatsResponse.projects:type_name -> dieter.v1.Project
+	19, // 4: dieter.v1.ChatsResponse.chats:type_name -> dieter.v1.Card
+	19, // 5: dieter.v1.StartCardResponse.card:type_name -> dieter.v1.Card
+	18, // 6: dieter.v1.DraftAgentSettings.provider_options:type_name -> dieter.v1.DraftAgentSettings.ProviderOptionsEntry
+	13, // 7: dieter.v1.UpdateCardRequest.agent_settings:type_name -> dieter.v1.DraftAgentSettings
+	22, // 8: dieter.v1.CardService.ListArchivedCards:input_type -> dieter.v1.BoardRef
+	2,  // 9: dieter.v1.CardService.CreateCard:input_type -> dieter.v1.CreateConversationRequest
+	2,  // 10: dieter.v1.CardService.CreateChat:input_type -> dieter.v1.CreateConversationRequest
+	4,  // 11: dieter.v1.CardService.ForkChat:input_type -> dieter.v1.ForkChatRequest
+	3,  // 12: dieter.v1.CardService.ListChats:input_type -> dieter.v1.ListChatsRequest
+	6,  // 13: dieter.v1.CardService.GetCard:input_type -> dieter.v1.GetCardRequest
+	7,  // 14: dieter.v1.CardService.MoveCard:input_type -> dieter.v1.MoveCardRequest
+	12, // 15: dieter.v1.CardService.MergeCard:input_type -> dieter.v1.MergeCardRequest
+	8,  // 16: dieter.v1.CardService.StartCard:input_type -> dieter.v1.StartCardRequest
+	10, // 17: dieter.v1.CardService.SetCardLabels:input_type -> dieter.v1.SetCardLabelsRequest
+	6,  // 18: dieter.v1.CardService.CancelCard:input_type -> dieter.v1.GetCardRequest
+	11, // 19: dieter.v1.CardService.RenameCard:input_type -> dieter.v1.RenameCardRequest
+	14, // 20: dieter.v1.CardService.UpdateCard:input_type -> dieter.v1.UpdateCardRequest
+	15, // 21: dieter.v1.CardService.ArchiveCard:input_type -> dieter.v1.ArchiveCardRequest
+	16, // 22: dieter.v1.CardService.PinChat:input_type -> dieter.v1.PinChatRequest
+	23, // 23: dieter.v1.CardService.GetTurnCaller:input_type -> google.protobuf.Empty
+	1,  // 24: dieter.v1.CardService.ListArchivedCards:output_type -> dieter.v1.CardsResponse
+	19, // 25: dieter.v1.CardService.CreateCard:output_type -> dieter.v1.Card
+	19, // 26: dieter.v1.CardService.CreateChat:output_type -> dieter.v1.Card
+	19, // 27: dieter.v1.CardService.ForkChat:output_type -> dieter.v1.Card
+	5,  // 28: dieter.v1.CardService.ListChats:output_type -> dieter.v1.ChatsResponse
+	24, // 29: dieter.v1.CardService.GetCard:output_type -> dieter.v1.CardDetail
+	19, // 30: dieter.v1.CardService.MoveCard:output_type -> dieter.v1.Card
+	19, // 31: dieter.v1.CardService.MergeCard:output_type -> dieter.v1.Card
+	9,  // 32: dieter.v1.CardService.StartCard:output_type -> dieter.v1.StartCardResponse
+	19, // 33: dieter.v1.CardService.SetCardLabels:output_type -> dieter.v1.Card
+	23, // 34: dieter.v1.CardService.CancelCard:output_type -> google.protobuf.Empty
+	19, // 35: dieter.v1.CardService.RenameCard:output_type -> dieter.v1.Card
+	19, // 36: dieter.v1.CardService.UpdateCard:output_type -> dieter.v1.Card
+	19, // 37: dieter.v1.CardService.ArchiveCard:output_type -> dieter.v1.Card
+	19, // 38: dieter.v1.CardService.PinChat:output_type -> dieter.v1.Card
+	0,  // 39: dieter.v1.CardService.GetTurnCaller:output_type -> dieter.v1.TurnCaller
+	24, // [24:40] is the sub-list for method output_type
+	8,  // [8:24] is the sub-list for method input_type
 	8,  // [8:8] is the sub-list for extension type_name
 	8,  // [8:8] is the sub-list for extension extendee
 	0,  // [0:8] is the sub-list for field type_name
@@ -1317,7 +1418,7 @@ func file_dieter_v1_cards_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dieter_v1_cards_proto_rawDesc), len(file_dieter_v1_cards_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

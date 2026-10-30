@@ -249,6 +249,22 @@ func (api *cardsAPI) ArchiveCard(_ context.Context, request *dieterv1.ArchiveCar
 	return protoCard(value), nil
 }
 
+// GetTurnCaller resolves the live agent turn whose token the call carries; a
+// host's services ask it before they act for an agent (the Home Assistant
+// add-on's hass-cli relay). The operator, the local CLI without a token and
+// remote devices are refused: they are no agent turn.
+func (api *cardsAPI) GetTurnCaller(ctx context.Context, _ *emptypb.Empty) (*dieterv1.TurnCaller, error) {
+	card, _, ok, err := api.server.turnCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, fault.New(fault.PermissionDenied, "not an agent turn: the call carries no live turn token")
+	}
+	return &dieterv1.TurnCaller{CardId: card.ID, ProjectId: card.ProjectID, VaultAccess: card.VaultAccess,
+		MailAccess: card.MailAccess, HomeAssistantAccess: card.HomeAssistantAccess}, nil
+}
+
 func (api *cardsAPI) PinChat(_ context.Context, request *dieterv1.PinChatRequest) (*dieterv1.Card, error) {
 	value, err := api.server.store.Kanban.PinChat(request.GetCardId(), request.GetPinned())
 	if err != nil {

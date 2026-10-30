@@ -308,10 +308,10 @@ func TestScheduleCopiesCapabilitiesOntoCreatedCards(t *testing.T) {
 	input := schedules.Input{
 		Project: project.ID, Board: board.ID, Name: "Nightly audit", Cron: "0 3 * * *", Timezone: "UTC", Enabled: true,
 		Action: model.ScheduleActionDraft, TitleTemplate: "Audit {{date}}", PromptTemplate: "Audit", Provider: "mock", Model: "mock",
-		OpenCardPolicy: "always", VaultAccess: true, MailAccess: true,
+		OpenCardPolicy: "always", VaultAccess: true, MailAccess: true, HomeAssistantAccess: true,
 	}
 	schedule, err := manager.Create(input)
-	if err != nil || !schedule.VaultAccess || !schedule.MailAccess {
+	if err != nil || !schedule.VaultAccess || !schedule.MailAccess || !schedule.HomeAssistantAccess {
 		t.Fatalf("schedule = %+v, %v", schedule, err)
 	}
 	run, err := manager.RunNow(schedule.ID)
@@ -319,12 +319,12 @@ func TestScheduleCopiesCapabilitiesOntoCreatedCards(t *testing.T) {
 		t.Fatal(err)
 	}
 	card, err := data.Kanban.ResolveCard(run.CardID)
-	if err != nil || !card.VaultAccess || !card.MailAccess {
-		t.Fatalf("card from a schedule with both capabilities = %+v, %v", card, err)
+	if err != nil || !card.VaultAccess || !card.MailAccess || !card.HomeAssistantAccess {
+		t.Fatalf("card from a schedule with every capability = %+v, %v", card, err)
 	}
 	// Editing the schedule applies to later occurrences only.
-	input.MailAccess = false
-	if schedule, err = manager.Update(schedule.ID, input); err != nil || schedule.MailAccess || !schedule.VaultAccess {
+	input.MailAccess, input.HomeAssistantAccess = false, false
+	if schedule, err = manager.Update(schedule.ID, input); err != nil || schedule.MailAccess || schedule.HomeAssistantAccess || !schedule.VaultAccess {
 		t.Fatalf("updated schedule = %+v, %v", schedule, err)
 	}
 	now = now.Add(time.Hour)
@@ -333,7 +333,7 @@ func TestScheduleCopiesCapabilitiesOntoCreatedCards(t *testing.T) {
 		t.Fatalf("second run = %+v, %v", next, err)
 	}
 	later, err := data.Kanban.ResolveCard(next.CardID)
-	if err != nil || !later.VaultAccess || later.MailAccess {
+	if err != nil || !later.VaultAccess || later.MailAccess || later.HomeAssistantAccess {
 		t.Fatalf("card after mail was switched off = %+v, %v", later, err)
 	}
 	if card, err = data.Kanban.ResolveCard(run.CardID); err != nil || !card.MailAccess {

@@ -219,6 +219,15 @@ func (c capabilityCaller) grantMail(granted bool) error {
 	return nil
 }
 
+// grantHomeAssistant refuses an agent turn that would turn Home Assistant
+// access on for a conversation or schedule while its own conversation lacks it.
+func (c capabilityCaller) grantHomeAssistant(granted bool) error {
+	if granted && c.agent && !c.card.HomeAssistantAccess {
+		return fault.New(fault.PermissionDenied, "a conversation without Home Assistant access cannot grant it")
+	}
+	return nil
+}
+
 // vaultAdmit classifies the caller and enforces the access rules.
 func (s *Server) vaultAdmit(ctx context.Context, action string, rules vaultRule) (vaultCaller, error) {
 	caller, err := s.vaultCaller(ctx)

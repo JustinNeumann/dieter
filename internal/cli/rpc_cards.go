@@ -15,6 +15,7 @@ import (
 
 	dieterv1 "github.com/dbpprt/dieter/internal/gen/dieter/v1"
 	"github.com/dbpprt/dieter/internal/model"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const cardHelp = `Usage: dieter card <action>
@@ -43,6 +44,8 @@ Actions:
   archive      Archive a card
   unarchive    Restore an archived card
   workspace    Use the project directory or an isolated worktree
+  caller       Show the conversation of the agent turn this runs in (its
+               DIETER_TURN_TOKEN) and what it may use, as JSON
 
 Messages sent with "card send" appear as the human's. Agents message each
 other with "dieter channel post" when agent channels are on.
@@ -92,6 +95,8 @@ func (c *CLI) rpcCard(args []string, chat bool) error {
 		return c.rpcCardList(args[1:], chat)
 	case "show":
 		return c.rpcCardShow(args[1:], false)
+	case "caller":
+		return c.rpcCardCaller(args[1:])
 	case "context":
 		return c.rpcCardShow(args[1:], true)
 	case "transcript":
@@ -235,6 +240,7 @@ before the command to create on another enrolled machine.
 	remotePublish := set.String("remote-publish", "", "manual, pull_request, or push_base")
 	vaultAccess := set.Bool("vault", false, "grant agent turns access to the account vault")
 	mailAccess := set.Bool("mail", false, "let agent turns send the user mail")
+	homeAssistantAccess := set.Bool("home-assistant", false, "let agent turns use Home Assistant (the Home Assistant add-on's hass-cli)")
 	format := set.String("format", "json", "json or id")
 	help, err := parse(set, args, c.scoped(usage), c.Out)
 	if help || err != nil {
@@ -288,7 +294,7 @@ before the command to create on another enrolled machine.
 		LabelIds: splitCSV(*labels), DeferStart: !chat && *lane != "running", Attachments: messageParts(attachments),
 		ClientId: "dieter-cli", CommandId: commandID, WorkspaceMode: *workspaceMode,
 		WorkspaceBranch: *branch, WorkspaceBaseBranch: *baseBranch, AutoGenerateTitle: *autoTitle,
-		WorkspaceBaseRemote: *baseRemote, RemotePublishMode: *remotePublish, VaultAccess: *vaultAccess, MailAccess: *mailAccess,
+		WorkspaceBaseRemote: *baseRemote, RemotePublishMode: *remotePublish, VaultAccess: *vaultAccess, MailAccess: *mailAccess, HomeAssistantAccess: *homeAssistantAccess,
 	}
 	client, rpcCtx, err := c.rpc(ctx)
 	if err != nil {
@@ -479,6 +485,34 @@ func (c *CLI) getCard(ctx context.Context, reference string) (*dieterv1.CardDeta
 		return nil, err
 	}
 	return client.GetCard(rpcCtx, &dieterv1.GetCardRequest{CardId: reference})
+}
+
+func (c *CLI) rpcCardCaller(args []string) error {
+	const usage = "Usage: dieter card caller\n\nShow the conversation of the agent turn this command runs in (DIETER_TURN_TOKEN)\nand what it may use, as JSON. Outside an agent turn it fails.\n"
+	if wantsHelp(args) {
+		fmt.Fprint(c.Out, usage)
+		return nil
+	}
+	if len(args) != 0 {
+		return errors.New("dieter card caller takes no arguments")
+	}
+	if c.env.TurnToken == "" {
+		return errors.New("not an agent turn: DIETER_TURN_TOKEN is not set")
+	}
+	if strings.TrimSpace(c.Machine) != "" {
+		return errors.New("dieter card caller asks the local daemon only; omit --machine")
+	}
+	ctx, cancel := c.commandContext()
+	defer cancel()
+	client, rpcCtx, err := c.rpc(ctx)
+	if err != nil {
+		return err
+	}
+	caller, err := client.GetTurnCaller(rpcCtx, &emptypb.Empty{})
+	if err != nil {
+		return err
+	}
+	return protoJSONOut(c.Out, caller)
 }
 
 func (c *CLI) rpcCardShow(args []string, compact bool) error {

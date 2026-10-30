@@ -546,6 +546,9 @@ message CreationIntent {
   // Let the conversation's agent turns send the user mail. Fixed at
   // creation; never remembered between forms.
   bool mail_access = 16;
+  // Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  // Agent turns may use Home Assistant (the add-on's hass-cli).
+  bool home_assistant_access = 1001;
 }
 
 // Binds a creation form's surface (SLICE_CREATION_PREVIEW, observed with a

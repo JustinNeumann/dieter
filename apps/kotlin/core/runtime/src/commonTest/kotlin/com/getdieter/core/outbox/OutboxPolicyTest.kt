@@ -202,13 +202,20 @@ class OutboxPolicyTest {
                 entry.copy(
                     request =
                         CreateConversationRequest.ADAPTER.encode(
-                                request.copy(mail_access = true, vault_access = true)
+                                request.copy(
+                                    mail_access = true,
+                                    vault_access = true,
+                                    home_assistant_access = true,
+                                )
                             )
                             .toByteString()
                 )
             }
         val capable = OutboxPolicy.optimisticCard(mail)!!
-        assertTrue(capable.mail_access && capable.vault_access, "the request's capabilities")
+        assertTrue(
+            capable.mail_access && capable.vault_access && capable.home_assistant_access,
+            "the request's capabilities",
+        )
     }
 
     private fun metadata(at: Instant) = "{\"createdAt\":\"$at\"}".encodeUtf8()

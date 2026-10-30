@@ -146,6 +146,7 @@ class AccountViewTest {
                 updated_at = "2026-10-01T11:00:00Z",
                 vault_access = true,
                 mail_access = true,
+                home_assistant_access = true,
             )
         val activity =
             Conversation(
@@ -178,7 +179,10 @@ class AccountViewTest {
         assertEquals("Only the owner knows", shown.initial_prompt)
         assertEquals("Doing it", shown.summary)
         assertEquals("2026-10-01T11:00:00Z", shown.updated_at)
-        assertTrue(shown.vault_access && shown.mail_access, "the owner's capabilities")
+        assertTrue(
+            shown.vault_access && shown.mail_access && shown.home_assistant_access,
+            "the owner's capabilities",
+        )
         assertEquals(listOf("s1"), shown.active_subagents.map { it.id })
         assertEquals(activity, view.activities["c"])
         assertEquals("/work/atlas", view.projects.getValue("p").checkouts.single().path)
@@ -193,6 +197,7 @@ class AccountViewTest {
         val shared = TestRecords.project(laptop).directory.item("c")!!
         assertEquals("", shared.initial_prompt)
         assertFalse(shared.mail_access)
+        assertFalse(shared.home_assistant_access)
         assertTrue(shared.active_subagents.isEmpty())
     }
 

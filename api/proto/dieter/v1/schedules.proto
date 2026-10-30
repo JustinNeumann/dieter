@@ -65,6 +65,9 @@ message Schedule {
   bool vault_access = 42;
   // Cards created by this schedule may send the user mail. Owner-local.
   bool mail_access = 43;
+  // Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  // Cards created by this schedule may use Home Assistant. Owner-local.
+  bool home_assistant_access = 1001;
 }
 
 message ScheduleDraft {
@@ -90,6 +93,8 @@ message ScheduleDraft {
   string workspace_mode = 19;
   bool vault_access = 41;
   bool mail_access = 42;
+  // Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  bool home_assistant_access = 1001;
 }
 
 message SaveScheduleRequest {

@@ -42,10 +42,13 @@ func (api *schedulesAPI) CreateSchedule(ctx context.Context, request *dieterv1.S
 	if err != nil {
 		return nil, err
 	}
-	if input.MailAccess {
+	if input.MailAccess || input.HomeAssistantAccess {
 		caller, err := api.server.capabilityCaller(ctx)
 		if err == nil {
-			err = caller.grantMail(true)
+			err = caller.grantMail(input.MailAccess)
+		}
+		if err == nil {
+			err = caller.grantHomeAssistant(input.HomeAssistantAccess)
 		}
 		if err != nil {
 			return nil, err
@@ -66,8 +69,8 @@ func (api *schedulesAPI) UpdateSchedule(ctx context.Context, request *dieterv1.S
 	if strings.TrimSpace(request.GetScheduleId()) == "" {
 		return nil, fault.New(fault.Invalid, "schedule ID is required")
 	}
-	if input.MailAccess {
-		// Only turning mail on is a grant; an agent may keep the current value.
+	if input.MailAccess || input.HomeAssistantAccess {
+		// Only turning an access on is a grant; an agent may keep the current value.
 		caller, err := api.server.capabilityCaller(ctx)
 		if err != nil {
 			return nil, err
@@ -77,7 +80,10 @@ func (api *schedulesAPI) UpdateSchedule(ctx context.Context, request *dieterv1.S
 			if err != nil {
 				return nil, err
 			}
-			if err := caller.grantMail(!current.MailAccess); err != nil {
+			if err := caller.grantMail(input.MailAccess && !current.MailAccess); err != nil {
+				return nil, err
+			}
+			if err := caller.grantHomeAssistant(input.HomeAssistantAccess && !current.HomeAssistantAccess); err != nil {
 				return nil, err
 			}
 		}
