@@ -3,6 +3,7 @@ package com.getdieter.core.schedules
 import com.getdieter.api.v1.Board
 import com.getdieter.api.v1.Checkout
 import com.getdieter.api.v1.Project
+import com.getdieter.api.v1.ScheduleDraft
 import com.getdieter.core.runtime.CoreException
 import com.getdieter.core.store.WorkspaceStore
 import com.getdieter.core.sync.DirectoryProjection
@@ -82,6 +83,33 @@ class SchedulesTest {
             listOf("c1", "b1", "UTC"),
             listOf(fallback.checkout_id, fallback.board_id, fallback.timezone),
             "the only checkout, the first board, and UTC",
+        )
+    }
+
+    @Test
+    fun everyProjectsSchedulesAreShownAndANewOneGoesToTheChosenProject() = runTest {
+        val schedules = schedules(backgroundScope)
+        schedules.bind("p", allProjects = true)
+        val view = schedules.view.value
+        assertEquals(null to true, view.projectId to view.allProjects)
+        assertTrue(view.shows("p") && view.shows("q"), "every project's schedules belong")
+        val unchosen = assertFailsWith<CoreException> { schedules.draft(null, null, null, "UTC") }
+        assertEquals("Choose a project for this schedule.", unchosen.message)
+        val draft = schedules.draft(null, null, "b2", "UTC", projectId = "p")
+        assertEquals(
+            listOf("p", "c1", "b2"),
+            listOf(draft.project_id, draft.checkout_id, draft.board_id),
+        )
+        val unsaved = assertFailsWith<CoreException> { schedules.save(ScheduleDraft()) }
+        assertEquals("Choose a project for this schedule.", unsaved.message)
+
+        schedules.bind("p")
+        assertFalse(schedules.view.value.allProjects)
+        assertFalse(schedules.view.value.shows("q"))
+        assertEquals(
+            "p",
+            schedules.draft(null, null, null, "UTC", projectId = "q").project_id,
+            "one project's list keeps new schedules in it",
         )
     }
 

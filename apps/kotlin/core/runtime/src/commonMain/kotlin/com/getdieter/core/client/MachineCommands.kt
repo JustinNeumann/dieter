@@ -61,6 +61,7 @@ internal suspend fun Schedules.execute(
                 request.checkout_id.ifEmpty { null },
                 request.selected_board_id.ifEmpty { null },
                 request.timezone,
+                request.project_id.ifEmpty { null },
             )
         return Result(schedule_draft = draft)
     }
@@ -78,7 +79,8 @@ internal suspend fun Schedules.execute(
     command.set_enabled?.let {
         return Result(schedule = setEnabled(it.schedule_id, it.enabled))
     }
-    command.bind?.let { bind(it.project_id.ifEmpty { null }) }
+    command.bind?.let { bind(it.project_id.ifEmpty { null }, it.all_projects) }
+
     command.load?.let { load() }
     command.load_more?.let { loadMore() }
     command.select?.let { select(it.schedule_id) }

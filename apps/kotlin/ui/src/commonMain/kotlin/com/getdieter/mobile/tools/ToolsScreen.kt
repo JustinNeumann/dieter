@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import com.getdieter.core.schedules.SchedulePresentations
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.extensions.*
@@ -21,9 +22,18 @@ import com.getdieter.mobile.screens.*
 import com.getdieter.mobile.settings.DevicesScreen
 import com.getdieter.mobile.settings.SettingsScreen
 import com.getdieter.mobile.store.*
+import kotlinx.coroutines.flow.MutableStateFlow
 
-/** "Project" and "Checkout" menus for project-scoped tools. */
-internal fun projectScopeMenu(store: MobileStore, rebind: () -> Unit): List<ChromeAction> {
+/**
+ * "Project" and "Checkout" menus for project-scoped tools; with [allProjects], the project menu
+ * also offers every project.
+ */
+internal fun projectScopeMenu(
+    store: MobileStore,
+    allProjects: MutableStateFlow<Boolean>? = null,
+    rebind: () -> Unit,
+): List<ChromeAction> {
+
     val workspace = store.workspace.slice.value
     val current = store.boards.currentProjectId()
     val project = workspace.projects.firstOrNull { it.id == current }
@@ -32,27 +42,44 @@ internal fun projectScopeMenu(store: MobileStore, rebind: () -> Unit): List<Chro
             .ifEmpty { store.creation.defaults.value.checkouts[current].orEmpty() }
             .ifEmpty { project?.checkouts?.singleOrNull()?.id.orEmpty() }
     val machines = store.session.slice.value.machines
+    val all = allProjects?.value == true
     return listOfNotNull(
         ChromeAction(
             "scope-project",
             "Project",
             Glyph.FOLDER,
-            subtitle = project?.name.orEmpty(),
+            subtitle = if (all) SchedulePresentations.ALL_PROJECTS else project?.name.orEmpty(),
             menu =
-                listOf(
+                listOfNotNull(
+                    allProjects?.let { flag ->
+                        MenuSection(
+                            listOf(
+                                ChromeAction(
+                                    "scope-project-all",
+                                    SchedulePresentations.ALL_PROJECTS,
+                                    checked = all,
+                                ) {
+                                    flag.value = true
+                                    rebind()
+                                }
+                            )
+                        )
+                    },
                     MenuSection(
                         workspace.projects.map { item ->
                             ChromeAction(
                                 "scope-project-${item.id}",
                                 item.name,
-                                checked = item.id == current,
+                                checked = !all && item.id == current,
                             ) {
+                                allProjects?.value = false
                                 store.boards.selectedProject.value = item.id
+
                                 store.boards.selectedCheckout.value = ""
                                 rebind()
                             }
                         }
-                    )
+                    ),
                 ),
         ),
         if ((project?.checkouts?.size ?: 0) > 1)
@@ -108,7 +135,8 @@ internal fun ToolsScreen(store: MobileStore) {
     val lowest =
         quotas.group_rows.filter { it.lowest_remaining >= 0 }.minOfOrNull { it.lowest_remaining }
     fun open(page: ToolPage) {
-        val scoped = page == ToolPage.FILES || page == ToolPage.CHANGES || page == ToolPage.SCHEDULES
+        val scoped =
+            page == ToolPage.FILES || page == ToolPage.CHANGES || page == ToolPage.SCHEDULES
         store.showFrom(
             MobileRoute.Root(MobileTab.TOOLS),
             if (scoped) MobileRoute.Tool(page, selectedProject.ifEmpty { project?.id.orEmpty() })

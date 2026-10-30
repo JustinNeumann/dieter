@@ -6,6 +6,7 @@ import com.getdieter.api.v1.EffortOption
 import com.getdieter.api.v1.Harness
 import com.getdieter.api.v1.HarnessModel
 import com.getdieter.api.v1.Label
+import com.getdieter.api.v1.Project
 import com.getdieter.api.v1.Schedule
 import com.getdieter.api.v1.ScheduleDraft
 import com.getdieter.api.v1.ScheduleRun
@@ -17,6 +18,33 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ScheduleRulesTest {
+    @Test
+    fun everyProjectsSchedulesAreGroupedInTheProjectListsOrder() {
+        val projects = listOf(Project(id = "b", name = "Beta"), Project(id = "a", name = "Alpha"))
+        val schedules =
+            listOf(
+                Schedule(id = "1", project_id = "a", name = "Daily"),
+                Schedule(id = "2", project_id = "x", name = "Hourly"),
+                Schedule(id = "3", project_id = "b", name = "Nightly"),
+                Schedule(id = "4", project_id = "a", name = "Weekly"),
+            )
+        assertEquals(
+            listOf(
+                "b" to listOf("3"),
+                "a" to listOf("1", "4"),
+                "" to listOf("2"),
+            ),
+            SchedulePresentations.byProject(schedules, projects).map { group ->
+                group.projectId to group.schedules.map { it.id }
+            },
+        )
+        assertEquals(
+            listOf("Beta", "Alpha", SchedulePresentations.OTHER_PROJECT),
+            SchedulePresentations.byProject(schedules, projects).map { it.name },
+        )
+        assertEquals(emptyList(), SchedulePresentations.byProject(emptyList(), projects))
+    }
+
     @Test
     fun friendlyTimingProducesDaemonCron() {
         assertEquals("30 14 * * 1-5", Cadence(CadenceKind.WEEKDAYS, 14, 30).cron())

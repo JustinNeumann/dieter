@@ -548,6 +548,7 @@ internal fun schedulesSlice(view: SchedulesView, harnesses: (daemonId: String) -
         rows = view.rows(harnesses),
         run_rows = view.runRows,
         preview_loading = view.previewLoading,
+        all_projects = view.allProjects,
     )
 
 internal fun terminalScope(target: TerminalTarget): TerminalScope? =

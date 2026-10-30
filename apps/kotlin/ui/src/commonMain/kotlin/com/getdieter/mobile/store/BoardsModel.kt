@@ -1,6 +1,7 @@
 package com.getdieter.mobile.store
 
 import com.getdieter.client.v1.*
+import com.getdieter.core.navigation.BoardSelections
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -25,8 +26,23 @@ internal constructor(
     fun currentProjectId() =
         selectedProject.value.ifEmpty {
             workspace.value.boards.firstOrNull { it.id == selectedBoard.value }?.project_id
-                ?: workspace.value.projects.firstOrNull()?.id.orEmpty()
+                ?: recentProject()
         }
+
+    private var recent: Pair<WorkspaceSlice, String>? = null
+
+    /** [BoardSelections.recentProject] of the workspace, worked out again when it changes. */
+    private fun recentProject(): String {
+        val current = workspace.value
+        recent
+            ?.takeIf { it.first === current }
+            ?.let {
+                return it.second
+            }
+        return BoardSelections.recentProject(current.projects, current.cards).also {
+            recent = current to it
+        }
+    }
 
     fun filterBoard(target: BoardViewTarget) {
         filter.value = target

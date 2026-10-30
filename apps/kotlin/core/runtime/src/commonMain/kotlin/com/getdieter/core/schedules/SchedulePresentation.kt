@@ -2,6 +2,7 @@ package com.getdieter.core.schedules
 
 import com.getdieter.api.v1.Harness
 import com.getdieter.api.v1.HarnessSelection
+import com.getdieter.api.v1.Project
 import com.getdieter.api.v1.Schedule
 import com.getdieter.api.v1.ScheduleRun
 import com.getdieter.client.v1.ScheduleRow
@@ -16,6 +17,9 @@ enum class SchedulesPresentation {
     LOADED,
 }
 
+/** One project's schedules in the list of every project's; [name] heads them. */
+data class ScheduleGroup(val projectId: String, val name: String, val schedules: List<Schedule>)
+
 /** Schedules and their runs as every view shows them. */
 object SchedulePresentations {
     const val EMPTY_TITLE = "No schedules"
@@ -27,6 +31,23 @@ object SchedulePresentations {
     const val RUNS_EMPTY = "No occurrences yet."
     const val LOAD_OLDER_RUNS = "Load older runs"
     const val LOADING_OLDER_RUNS = "Loading older runs…"
+    const val ALL_PROJECTS = "All projects"
+    const val OTHER_PROJECT = "Other project"
+
+    /**
+     * [schedules] by project for the list of every project's: in the order of [projects] (the
+     * project list's), each with its schedules in list order; those of a project missing from
+     * [projects] come last, under [OTHER_PROJECT].
+     */
+    fun byProject(schedules: List<Schedule>, projects: List<Project>): List<ScheduleGroup> {
+        val grouped = schedules.groupBy { it.project_id }
+        val known = projects.mapNotNull { project ->
+            grouped[project.id]?.let { ScheduleGroup(project.id, project.name, it) }
+        }
+        val ids = projects.mapTo(HashSet()) { it.id }
+        val other = schedules.filter { it.project_id !in ids }
+        return if (other.isEmpty()) known else known + ScheduleGroup("", OTHER_PROJECT, other)
+    }
 
     /**
      * Failed only while nothing is shown; loading until the first list arrives and while a reload

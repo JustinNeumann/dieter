@@ -1014,7 +1014,7 @@ message ProjectWorkspaceRemove {
 message SchedulesCommand {
   string scope = 14;
   oneof action {
-    // Shows a project's schedules; empty shows none.
+    // Shows a project's schedules, or every project's; empty shows none.
     ScheduleProject bind = 1;
     Step load = 2;
     Step load_more = 3;
@@ -1050,9 +1050,16 @@ message ScheduleDraftRequest {
   string selected_board_id = 3;
   // The device's IANA time zone, which a new schedule starts in; empty is UTC.
   string timezone = 4;
+  // The project a new schedule belongs to while every project's schedules are
+  // shown; ignored otherwise.
+  string project_id = 5;
 }
 
-message ScheduleProject { string project_id = 1; }
+message ScheduleProject {
+  string project_id = 1;
+  // Every project's schedules; project_id is ignored.
+  bool all_projects = 2;
+}
 message ScheduleId { string schedule_id = 1; }
 
 message SchedulePreview {
@@ -2544,7 +2551,10 @@ message SchedulesSlice {
   repeated ScheduleRunRow run_rows = 20;
   // A preview of the editor's timing is pending.
   bool preview_loading = 21;
+  // Every project's schedules are shown; project_id is empty.
+  bool all_projects = 22;
 }
+
 
 // --- Schedules ---------------------------------------------------------------
 

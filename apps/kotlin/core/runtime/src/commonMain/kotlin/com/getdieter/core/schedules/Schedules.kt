@@ -37,6 +37,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 data class SchedulesView(
     val projectId: String? = null,
+    /** Every project's schedules are shown; [projectId] is null. */
+    val allProjects: Boolean = false,
     val schedules: List<Schedule> = emptyList(),
     val totalCount: Int = 0,
     val nextPageToken: String = "",
@@ -68,6 +70,9 @@ data class SchedulesView(
     val subtitle: String
         get() = SchedulePresentations.subtitle(loaded, totalCount, error)
 
+    /** The view lists [projectId]'s schedules. */
+    fun shows(projectId: String): Boolean = allProjects || projectId == this.projectId
+
     /** [schedules] as rows, in the same order; [harnesses] name each owner machine's agents. */
     fun rows(harnesses: (daemonId: String) -> List<Harness> = { emptyList() }): List<ScheduleRow> =
         schedules.map {
@@ -80,10 +85,11 @@ data class SchedulesView(
 }
 
 /**
- * Schedules of one project. Lists come from any machine with the project; full definitions, run
- * history, and every mutation go to the machine that owns the schedule. Results for a project that
- * is no longer shown are dropped. [metadata] supplies the agents a new draft starts with; without
- * it, drafts start without one. Confined to the core dispatcher.
+ * Schedules of one project, or of every project. Lists come from any machine with the project (any
+ * reachable machine for every project's); full definitions, run history, and every mutation go to
+ * the machine that owns the schedule. Results for a project that is no longer shown are dropped.
+ * [metadata] supplies the agents a new draft starts with; without it, drafts start without one.
+ * Confined to the core dispatcher.
  */
 class Schedules(
     private val sessions: MachineSessions,
@@ -108,12 +114,13 @@ class Schedules(
         mutableView.value = SchedulesView()
     }
 
-    /** Shows [projectId]'s schedules, or nothing. */
-    fun bind(projectId: String?) {
-        if (projectId == view.value.projectId) return
+    /** Shows [projectId]'s schedules, every project's with [allProjects], or nothing. */
+    fun bind(projectId: String?, allProjects: Boolean = false) {
+        val project = projectId.takeUnless { allProjects }
+        if (project == view.value.projectId && allProjects == view.value.allProjects) return
         binding++
         previewJob?.cancel()
-        mutableView.value = SchedulesView(projectId = projectId)
+        mutableView.value = SchedulesView(projectId = project, allProjects = allProjects)
     }
 
     private fun projectMachine(projectId: String): String =
@@ -122,6 +129,16 @@ class Schedules(
                 FailureKind.TRANSIENT,
                 "No machine with this project is reachable.",
             )
+
+    /** Lists and previews: a machine with the shown project, any machine for every project's. */
+    private fun listMachine(): String =
+        view.value.projectId?.let(::projectMachine)
+            ?: choice.any()
+            ?: throw CoreException(FailureKind.TRANSIENT, "No machine is reachable.")
+
+    /** A project, or every project, is shown. */
+    private val showing: Boolean
+        get() = view.value.projectId != null || view.value.allProjects
 
     /** The machine that owns [schedule]: its recorded owner, else its checkout's machine. */
     private fun owner(schedule: Schedule): String =
@@ -138,14 +155,15 @@ class Schedules(
     }
 
     private suspend fun page(more: Boolean) {
-        val projectId = view.value.projectId ?: return
+        if (!showing) return
+        val projectId = view.value.projectId.orEmpty()
         val bound = binding
         val request = ++listRequest
         mutableView.update { if (more) it.copy(loadingMore = true) else it.copy(loading = true) }
         try {
             val token = if (more) view.value.nextPageToken else ""
             val response =
-                sessions.call(projectMachine(projectId), Deadlines.CALL) {
+                sessions.call(listMachine(), Deadlines.CALL) {
                     it.ListSchedules()
                         .execute(
                             ListSchedulesRequest(
@@ -282,19 +300,25 @@ class Schedules(
      * its owner, or a new schedule in [timezone] (UTC when blank) on [checkoutId] (else the
      * project's only checkout), with the project's boards and the agents of the machine that runs
      * it. The agents are those the machine reported within 5 s; otherwise the draft starts without
-     * one.
+     * one. While every project's schedules are shown, a new schedule belongs to [projectId].
      */
     suspend fun draft(
         scheduleId: String?,
         checkoutId: String?,
         selectedBoardId: String?,
         timezone: String,
+        projectId: String? = null,
     ): ScheduleDraft {
+        val summary = scheduleId?.let { id -> view.value.schedules.firstOrNull { it.id == id } }
         val projectId =
             view.value.projectId
+                ?: (summary?.project_id?.ifEmpty { null } ?: projectId?.ifEmpty { null })?.takeIf {
+                    view.value.allProjects
+                }
                 ?: throw CoreException(
                     FailureKind.PERMANENT,
-                    "This project is no longer connected. Close the editor and reconnect.",
+                    if (view.value.allProjects) "Choose a project for this schedule."
+                    else "This project is no longer connected. Close the editor and reconnect.",
                 )
         val existing = scheduleId?.let { details(it) }
         val checkout =
@@ -343,7 +367,7 @@ class Schedules(
         if (key == previewKey && previewJob?.isActive == true) return
         previewKey = key
         previewJob?.cancel()
-        val projectId = view.value.projectId ?: return
+        if (!showing) return
         if (cron.isBlank() || timezone.isBlank()) {
             mutableView.update {
                 it.copy(preview = emptyList(), previewError = null, previewLoading = false)
@@ -357,7 +381,7 @@ class Schedules(
             try {
                 val times =
                     sessions
-                        .call(projectMachine(projectId), Deadlines.CALL) {
+                        .call(listMachine(), Deadlines.CALL) {
                             it.PreviewSchedule()
                                 .execute(
                                     PreviewScheduleRequest(
@@ -397,18 +421,30 @@ class Schedules(
 
     /**
      * Creates a schedule on the chosen checkout's machine, or updates one on its owner. The
-     * checkout of an existing schedule cannot change.
+     * checkout of an existing schedule cannot change. While every project's schedules are shown, a
+     * schedule stays in its project and a new one goes to the draft's.
      */
     suspend fun save(
         draft: ScheduleDraft,
         scheduleId: String? = null,
         checkoutId: String? = null,
     ): Schedule {
+        val listed =
+            scheduleId
+                ?.ifEmpty { null }
+                ?.let { id ->
+                    view.value.schedules.firstOrNull { it.id == id }
+                }
         val projectId =
             view.value.projectId
+                ?: (listed?.project_id?.ifEmpty { null } ?: draft.project_id.ifEmpty { null })
+                    ?.takeIf {
+                        view.value.allProjects
+                    }
                 ?: throw CoreException(
                     FailureKind.PERMANENT,
-                    "This project is no longer connected. Close the editor and reconnect.",
+                    if (view.value.allProjects) "Choose a project for this schedule."
+                    else "This project is no longer connected. Close the editor and reconnect.",
                 )
         if (draft.project_id.isNotEmpty() && draft.project_id != projectId)
             throw CoreException(
@@ -467,7 +503,8 @@ class Schedules(
                     it.UpdateSchedule().execute(request)
                 }
             }
-        if (bound != binding || saved.project_id != projectId) return saved
+        if (bound != binding || !view.value.shows(saved.project_id)) return saved
+
         listRequest++
         upsert(saved)
         select(saved.id)

@@ -20,6 +20,8 @@ import com.getdieter.client.v1.*
 import com.getdieter.core.schedules.Cadence
 import com.getdieter.core.schedules.CadenceKind
 import com.getdieter.core.schedules.ScheduleDrafts
+import com.getdieter.core.schedules.ScheduleGroup
+import com.getdieter.core.schedules.SchedulePresentations
 import com.getdieter.core.schedules.ScheduleTemplates
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.creation.*
@@ -35,30 +37,14 @@ internal fun SchedulesScreen(store: MobileStore) {
     var deleteId by remember { mutableStateOf("") }
     fun command(value: SchedulesCommand) =
         store.command(Command(schedules = value.copy(scope = MobileStore.SCHEDULES_SCOPE)))
-    fun rebind() {
-        val projectId = store.boards.currentProjectId()
-        store.action {
-            store.core.dispatch(
-                Command(
-                    schedules =
-                        SchedulesCommand(
-                            scope = MobileStore.SCHEDULES_SCOPE,
-                            bind = ScheduleProject(projectId),
-                        )
-                )
-            )
-            store.core.dispatch(
-                Command(
-                    schedules = SchedulesCommand(scope = MobileStore.SCHEDULES_SCOPE, load = Step())
-                )
-            )
-        }
-    }
+    fun rebind() = store.schedules.load(store.boards.currentProjectId())
     val project = workspace.projects.firstOrNull { it.id == store.boards.currentProjectId() }
     Screen(
         ScreenChrome(
             "Schedules",
-            subtitle = project?.name.orEmpty(),
+            subtitle =
+                if (view.all_projects) SchedulePresentations.ALL_PROJECTS
+                else project?.name.orEmpty(),
             actions =
                 listOf(
                     ChromeAction(
@@ -78,7 +64,10 @@ internal fun SchedulesScreen(store: MobileStore) {
                                         }
                                     )
                                 ),
-                                MenuSection(projectScopeMenu(store, ::rebind).take(1)),
+                                MenuSection(
+                                    projectScopeMenu(store, store.schedules.allProjects, ::rebind)
+                                        .take(1)
+                                ),
                             ),
                     ),
                     ChromeAction("new-schedule", "New schedule", Glyph.ADD) { editorId = "" },
@@ -131,99 +120,114 @@ internal fun SchedulesScreen(store: MobileStore) {
                         DButton("New schedule", { editorId = "" }, glyph = Glyph.ADD)
                     }
                 }
-            itemsIndexed(view.schedules, key = { _, schedule -> schedule.id }) { _, schedule ->
-                val row = view.rows.firstOrNull { it.id == schedule.id }
-                val menu = rememberMenuState()
-                val sections =
-                    listOf(
-                        MenuSection(
-                            listOf(
-                                ChromeAction("run-${schedule.id}", "Run now", Glyph.PLAY) {
-                                    command(SchedulesCommand(run_now = ScheduleId(schedule.id)))
-                                },
-                                ChromeAction(
-                                    "history-${schedule.id}",
-                                    "Run history",
-                                    Glyph.HISTORY,
-                                ) {
-                                    command(SchedulesCommand(select = ScheduleId(schedule.id)))
-                                },
-                                ChromeAction("edit-${schedule.id}", "Edit…", Glyph.EDIT) {
-                                    editorId = schedule.id
-                                },
-                            )
-                        ),
-                        MenuSection(
-                            listOf(
-                                ChromeAction(
-                                    "delete-${schedule.id}",
-                                    "Delete",
-                                    Glyph.TRASH,
-                                    destructive = true,
-                                ) {
-                                    deleteId = schedule.id
+            // Every project's schedules under their project's name; one project's as they are.
+            val groups =
+                if (view.all_projects)
+                    SchedulePresentations.byProject(view.schedules, workspace.projects)
+                else listOf(ScheduleGroup(view.project_id, "", view.schedules))
+            for (group in groups) {
+                if (view.all_projects)
+                    item(key = "project-${group.projectId}") {
+                        SectionHeader(
+                            group.name,
+                            Modifier.testTag("schedules-project-${group.projectId}"),
+                        )
+                    }
+                itemsIndexed(group.schedules, key = { _, schedule -> schedule.id }) { _, schedule ->
+                    val row = view.rows.firstOrNull { it.id == schedule.id }
+                    val menu = rememberMenuState()
+                    val sections =
+                        listOf(
+                            MenuSection(
+                                listOf(
+                                    ChromeAction("run-${schedule.id}", "Run now", Glyph.PLAY) {
+                                        command(SchedulesCommand(run_now = ScheduleId(schedule.id)))
+                                    },
+                                    ChromeAction(
+                                        "history-${schedule.id}",
+                                        "Run history",
+                                        Glyph.HISTORY,
+                                    ) {
+                                        command(SchedulesCommand(select = ScheduleId(schedule.id)))
+                                    },
+                                    ChromeAction("edit-${schedule.id}", "Edit…", Glyph.EDIT) {
+                                        editorId = schedule.id
+                                    },
+                                )
+                            ),
+                            MenuSection(
+                                listOf(
+                                    ChromeAction(
+                                        "delete-${schedule.id}",
+                                        "Delete",
+                                        Glyph.TRASH,
+                                        destructive = true,
+                                    ) {
+                                        deleteId = schedule.id
+                                    }
+                                )
+                            ),
+                        )
+                    MenuAnchor(menu) {
+                        ContentCard(
+                            Modifier.padding(horizontal = ScreenMargin, vertical = 5.dp)
+                                .testTag("schedule-${schedule.id}"),
+                            onClick = { editorId = schedule.id },
+                            onLongClick = { menu.show(sections) },
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        schedule.name,
+                                        style = type.headline,
+                                        color = palette.label,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        row?.timing.orEmpty(),
+                                        style = type.subheadline,
+                                        color = palette.secondaryLabel,
+                                    )
                                 }
-                            )
-                        ),
-                    )
-                MenuAnchor(menu) {
-                    ContentCard(
-                        Modifier.padding(horizontal = ScreenMargin, vertical = 5.dp)
-                            .testTag("schedule-${schedule.id}"),
-                        onClick = { editorId = schedule.id },
-                        onLongClick = { menu.show(sections) },
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
+                                DSwitch(
+                                    schedule.enabled,
+                                    {
+                                        command(
+                                            SchedulesCommand(
+                                                set_enabled = ScheduleEnabled(schedule.id, it)
+                                            )
+                                        )
+                                    },
+                                )
+                            }
+                            if (!row?.subtitle.isNullOrEmpty()) {
+                                Spacer(Modifier.height(6.dp))
                                 Text(
-                                    schedule.name,
-                                    style = type.headline,
+                                    row.subtitle,
+                                    style = type.subheadline,
                                     color = palette.label,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
                                 )
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    row?.timing.orEmpty(),
-                                    style = type.subheadline,
+                                    listOf(row?.placement.orEmpty(), row?.status.orEmpty())
+                                        .filter { it.isNotEmpty() }
+                                        .joinToString(" · "),
+                                    Modifier.weight(1f),
+                                    style = type.footnote,
                                     color = palette.secondaryLabel,
                                 )
+                                MenuButton(sections, "Schedule actions")
                             }
-                            DSwitch(
-                                schedule.enabled,
-                                {
-                                    command(
-                                        SchedulesCommand(
-                                            set_enabled = ScheduleEnabled(schedule.id, it)
-                                        )
-                                    )
-                                },
-                            )
-                        }
-                        if (!row?.subtitle.isNullOrEmpty()) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                row.subtitle,
-                                style = type.subheadline,
-                                color = palette.label,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                listOf(row?.placement.orEmpty(), row?.status.orEmpty())
-                                    .filter { it.isNotEmpty() }
-                                    .joinToString(" · "),
-                                Modifier.weight(1f),
-                                style = type.footnote,
-                                color = palette.secondaryLabel,
-                            )
-                            MenuButton(sections, "Schedule actions")
                         }
                     }
                 }
             }
+
             if (view.next_page_token.isNotEmpty())
                 item {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -314,10 +318,15 @@ private fun ScheduleEditor(store: MobileStore, scheduleId: String, onDismiss: ()
     val schedules by store.schedules.slice.collectAsState()
     val busy by store.busy.collectAsState()
     var draft by remember(scheduleId) { mutableStateOf<ScheduleDraft?>(null) }
-    LaunchedEffect(scheduleId) {
+    // A new schedule in the list of every project's starts in the tools' project and may move to
+    // another before it is saved; what was typed so far comes along.
+    val choosesProject = scheduleId.isEmpty() && schedules.all_projects
+    var projectId by remember(scheduleId) { mutableStateOf(store.boards.currentProjectId()) }
+    var carried by remember(scheduleId) { mutableStateOf<ScheduleDraft?>(null) }
+    LaunchedEffect(scheduleId, projectId) {
         store.action {
             store.creation.chat.value = false
-            draft =
+            val fresh =
                 store.core
                     .dispatch(
                         Command(
@@ -329,11 +338,16 @@ private fun ScheduleEditor(store: MobileStore, scheduleId: String, onDismiss: ()
                                             schedule_id = scheduleId,
                                             selected_board_id = store.boards.selectedBoard.value,
                                             timezone = "UTC",
+                                            project_id = projectId,
                                         ),
                                 )
                         )
                     )
                     .schedule_draft
+            draft =
+                carried?.let { typed ->
+                    fresh?.copy(name = typed.name, cron = typed.cron, timezone = typed.timezone)
+                } ?: fresh
             draft?.let {
                 store.creation.update(
                     CreationIntent(
@@ -396,8 +410,24 @@ private fun ScheduleEditor(store: MobileStore, scheduleId: String, onDismiss: ()
         SectionHeader("Destination")
         val project = workspace.projects.firstOrNull { it.id == value.project_id }
         val boards = workspace.boards.filter { it.project_id == value.project_id }
-        Group(listOf(0, 1)) { index, position ->
-            if (index == 0)
+        Group(if (choosesProject) listOf(-1, 0, 1) else listOf(0, 1)) { index, position ->
+            if (index == -1)
+                PickerRow(
+                    "Project",
+                    project?.name.orEmpty(),
+                    workspace.projects.map { it.id to it.name },
+                    value.project_id,
+                    workspace.projects.size > 1,
+                    position,
+                    Glyph.FOLDER,
+                ) { id ->
+                    if (id != value.project_id) {
+                        carried = value
+                        draft = null
+                        projectId = id
+                    }
+                }
+            else if (index == 0)
                 PickerRow(
                     "Board",
                     boards.firstOrNull { it.id == value.board_id }?.name.orEmpty(),
