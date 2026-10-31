@@ -3,13 +3,16 @@ package com.getdieter.mobile.store
 import com.getdieter.api.v1.HarnessSelection
 import com.getdieter.client.v1.*
 import com.getdieter.core.composition.Titles
+import com.getdieter.core.outbox.OutboxPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * A host that names new tasks and chats itself instead of Dieter's auto-title (the add-on: a local
@@ -18,7 +21,10 @@ import kotlinx.coroutines.launch
 interface ConversationNamer {
     fun names(daemonId: String): Boolean
 
-    /** [id] was created under [provisional], Dieter's placeholder; the host renames it from [prompt]. */
+    /**
+     * [id] was created under [provisional], Dieter's placeholder; the host renames it from
+     * [prompt].
+     */
     suspend fun name(id: String, chat: Boolean, prompt: String, provisional: String)
 }
 
@@ -27,6 +33,8 @@ class CreationModel
 internal constructor(
     private val context: StoreContext,
     private val workspace: StateFlow<WorkspaceSlice>,
+    /** The core's outbox: which server ID a conversation created here got. */
+    private val outbox: StateFlow<OutboxSlice>,
     private val boards: BoardsModel,
     /** Runs after new creation defaults arrive, e.g. to rebind a project tool's checkout. */
     private val defaultsChanged: () -> Unit,
@@ -116,14 +124,18 @@ internal constructor(
 
     /**
      * Creates the form's conversation in [intent]'s lane. Sent without a title to a machine [namer]
-     * names, it is created under Dieter's placeholder title, without the auto-title, and handed to it.
+     * names, it is created under Dieter's placeholder title, without the auto-title, and handed to
+     * it once the machine has it: the core answers with a local ID until then, which the host
+     * cannot rename.
      */
     suspend fun submit(intent: CreationIntent, namer: ConversationNamer? = null): String {
         previewJob?.join()
         val form = this.intent.value
         val provisional =
             namer
-                ?.takeIf { Titles.generated(form.title, form.prompt) && it.names(preview.value.daemon_id) }
+                ?.takeIf {
+                    Titles.generated(form.title, form.prompt) && it.names(preview.value.daemon_id)
+                }
                 ?.let {
                     if (chat.value) Titles.chat(form.prompt, form.attachments)
                     else Titles.creation("", form.prompt, form.attachments)
@@ -133,12 +145,24 @@ internal constructor(
             context.core
                 .dispatch(
                     Command(
-                        create_conversation = CreateConversation(chat = chat.value, intent = resolved)
+                        create_conversation =
+                            CreateConversation(chat = chat.value, intent = resolved)
                     )
                 )
                 .card
                 ?.id ?: error("The core returned no conversation.")
-        if (provisional != null) namer?.name(id, chat.value, form.prompt.trim(), provisional)
+        if (provisional != null && namer != null) {
+            val chat = chat.value
+            context.scope.launch {
+                val named =
+                    if (!id.startsWith(OutboxPolicy.LOCAL_PREFIX)) id
+                    else
+                        withTimeoutOrNull(NAMING_WAIT) {
+                            outbox.first { id in it.resolutions }.resolutions.getValue(id)
+                        } ?: return@launch // not delivered in time: the placeholder stays
+                runCatching { namer.name(named, chat, form.prompt.trim(), provisional) }
+            }
+        }
         return id
     }
 
@@ -167,5 +191,10 @@ internal constructor(
                 )
             )
         return result.card?.id ?: error("The core returned no task.")
+    }
+
+    private companion object {
+        /** As long as the host waits for its model (the add-on: 2 minutes). */
+        const val NAMING_WAIT = 120_000L
     }
 }

@@ -123,16 +123,30 @@ class MobileStoreTest {
             store.push(MobileRoute.Board("b2"))
             runCurrent()
             assertEquals(listOf("p2"), core.sentOf { it.remember_creation }.map { it.project_id })
-            core.publish(Slice.SLICE_CREATION, update = Update(creation = CreationSlice(project_id = "p2")))
+            core.publish(
+                Slice.SLICE_CREATION,
+                update = Update(creation = CreationSlice(project_id = "p2")),
+            )
             runCurrent()
             store.selectTab(MobileTab.PROJECTS)
-            assertEquals(1, store.routes.value.stack.size, "selecting Projects again still returns to the list")
+            assertEquals(
+                1,
+                store.routes.value.stack.size,
+                "selecting Projects again still returns to the list",
+            )
             store.selectTab(MobileTab.INBOX)
             store.selectTab(MobileTab.PROJECTS)
             assertEquals(MobileRoute.Project("p2"), store.routes.value.top)
             runCurrent()
-            assertEquals(1, core.sentOf { it.remember_creation }.size, "the remembered project is not sent again")
-            core.publish(Slice.SLICE_CREATION, update = Update(creation = CreationSlice(project_id = "gone")))
+            assertEquals(
+                1,
+                core.sentOf { it.remember_creation }.size,
+                "the remembered project is not sent again",
+            )
+            core.publish(
+                Slice.SLICE_CREATION,
+                update = Update(creation = CreationSlice(project_id = "gone")),
+            )
             runCurrent()
             store.selectTab(MobileTab.PROJECTS)
             store.selectTab(MobileTab.INBOX)
@@ -174,7 +188,9 @@ class MobileStoreTest {
             command.creation_preview?.let {
                 Result(creation_preview = CreationPreview(intent = it.intent, daemon_id = "d-ha"))
             }
-                ?: command.create_conversation?.let { Result(card = Card(id = "c-${++created}")) }
+                ?: command.create_conversation?.let {
+                    Result(card = Card(id = "local_${++created}"))
+                }
                 ?: Result(done = Done())
         }
         val named = mutableListOf<List<Any>>()
@@ -182,20 +198,47 @@ class MobileStoreTest {
             object : ConversationNamer {
                 override fun names(daemonId: String) = daemonId == "d-ha"
 
-                override suspend fun name(id: String, chat: Boolean, prompt: String, provisional: String) {
+                override suspend fun name(
+                    id: String,
+                    chat: Boolean,
+                    prompt: String,
+                    provisional: String,
+                ) {
                     named += listOf(id, chat, prompt, provisional)
                 }
             }
         val store = store(core)
         try {
             store.newConversation(chat = false)
-            store.creation.update(store.creation.intent.value.copy(prompt = "  Fix the heating in the bath\nsoon"))
+            store.creation.update(
+                store.creation.intent.value.copy(prompt = "  Fix the heating in the bath\nsoon")
+            )
             advanceTimeBy(200)
             runCurrent()
             val id = store.creation.submit(CreationIntent(lane = "todo"), namer)
             val sent = core.sentOf { it.create_conversation }.last().intent!!
-            assertEquals("Fix the heating in the bath", sent.title, "Dieter's placeholder: no auto-title")
-            assertEquals(listOf<List<Any>>(listOf(id, false, "Fix the heating in the bath\nsoon", sent.title)), named)
+            assertEquals(
+                "Fix the heating in the bath",
+                sent.title,
+                "Dieter's placeholder: no auto-title",
+            )
+            runCurrent()
+            assertEquals(
+                emptyList(),
+                named,
+                "not under the core's local ID, which the machine does not know",
+            )
+            core.publish(
+                Slice.SLICE_OUTBOX,
+                update = Update(outbox = OutboxSlice(resolutions = mapOf(id to "c-1"))),
+            )
+            runCurrent()
+            assertEquals(
+                listOf<List<Any>>(
+                    listOf("c-1", false, "Fix the heating in the bath\nsoon", sent.title)
+                ),
+                named,
+            )
             // a title of one's own, or another machine: Dieter's way
             store.creation.update(store.creation.intent.value.copy(title = "Heating"))
             advanceTimeBy(200)
@@ -205,9 +248,12 @@ class MobileStoreTest {
             store.creation.update(store.creation.intent.value.copy(title = ""))
             advanceTimeBy(200)
             runCurrent()
-            store.creation.submit(CreationIntent(lane = "todo"), object : ConversationNamer by namer {
-                override fun names(daemonId: String) = false
-            })
+            store.creation.submit(
+                CreationIntent(lane = "todo"),
+                object : ConversationNamer by namer {
+                    override fun names(daemonId: String) = false
+                },
+            )
             assertEquals("", core.sentOf { it.create_conversation }.last().intent!!.title)
             assertEquals(1, named.size)
         } finally {

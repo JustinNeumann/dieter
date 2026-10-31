@@ -44,7 +44,7 @@ class MobileStore(
     val boards: BoardsModel = BoardsModel(context, workspace.slice)
     val conversation: ConversationModel = ConversationModel(context, workspace.outbox)
     val creation: CreationModel =
-        CreationModel(context, workspace.slice, boards, ::rebindProjectTool)
+        CreationModel(context, workspace.slice, workspace.outbox, boards, ::rebindProjectTool)
     val sharing: SharingModel = SharingModel(context, workspace.slice, creation, navigator)
     val files: FilesModel = FilesModel(context, workspace.slice, boards, creation.defaults)
     val schedules: SchedulesModel = SchedulesModel(context)
