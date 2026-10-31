@@ -1479,8 +1479,9 @@ class ClientApiEndToEndTest : EndToEnd() {
         assertEquals("", preview.problem, "preview: $preview")
         assertEquals(CreationCatalogState.CREATION_CATALOG_STATE_LIVE, preview.catalog)
         val intent = preview.intent!!
+        // A new task starts in a new worktree, whatever the remembered mode ("project" above).
         assertEquals(
-            listOf(fixture.boardId, checkoutId, "mock", "project"),
+            listOf(fixture.boardId, checkoutId, "mock", "worktree"),
             listOf(
                 intent.board_id,
                 intent.checkout_id,
