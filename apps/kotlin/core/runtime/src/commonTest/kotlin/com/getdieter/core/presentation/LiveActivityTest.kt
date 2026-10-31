@@ -173,7 +173,10 @@ class LiveActivityTest {
         )
         assertEquals(
             "Editing antigravity-runtime.mjs",
-            label("edit_file", """{"Path":"/repo/internal/harness/runtime/antigravity-runtime.mjs"}"""),
+            label(
+                "edit_file",
+                """{"Path":"/repo/internal/harness/runtime/antigravity-runtime.mjs"}""",
+            ),
         )
         assertEquals(
             "Running node --test antigravity-runtime.test.mjs",

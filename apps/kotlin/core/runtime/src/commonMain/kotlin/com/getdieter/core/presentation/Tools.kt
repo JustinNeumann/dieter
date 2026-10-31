@@ -257,7 +257,14 @@ object Tools {
                 "websearch",
                 "web_search" ->
                     ToolAction.SEARCHING to
-                        listOf("query", "Query", "pattern", "Pattern", "SearchPath", "SearchDirectory")
+                        listOf(
+                            "query",
+                            "Query",
+                            "pattern",
+                            "Pattern",
+                            "SearchPath",
+                            "SearchDirectory",
+                        )
                 "webfetch",
                 "web_fetch",
                 "fetch",
