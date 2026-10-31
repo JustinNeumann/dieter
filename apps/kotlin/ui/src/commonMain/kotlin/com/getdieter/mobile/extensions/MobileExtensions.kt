@@ -21,9 +21,9 @@ import com.getdieter.mobile.store.MobileStore
  */
 @Immutable
 internal class MobileExtensions(
-    /** Pages, listed in the Tools tab when [ExtensionPage.section] is set. */
+    /** Pages, listed in More when [ExtensionPage.section] is set. */
     val pages: List<ExtensionPage> = emptyList(),
-    /** Sections appended to a built-in tool page (Machines, Usage, Devices, Settings). */
+    /** Sections appended to a built-in page (Usage, Devices, Settings). */
     val toolSections: Map<ToolPage, List<ExtensionSection>> = emptyMap(),
     /** Content at the top of the Inbox, below its search and filters. */
     val inboxSections: List<ExtensionSection> = emptyList(),
@@ -75,9 +75,12 @@ internal class ExtensionPage(
     val title: String,
     val glyph: Glyph,
     val tint: Long,
-    /** The Tools section listing the page; null for pages opened only by route. */
+    /**
+     * Where More lists the page (with its places, or its account pages); null for pages opened only
+     * by route.
+     */
     val section: ToolSection? = null,
-    /** A short value at the end of its Tools row, e.g. "2 open". */
+    /** A short value at the end of its More row, e.g. "2 open". */
     val value: @Composable (MobileStore) -> String? = { null },
     /**
      * Whether the page for [arg] takes the whole width of a wide layout (e.g. a Dreamfall board)

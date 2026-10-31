@@ -120,7 +120,18 @@ func (api *gitAPI) GetSCMCapabilities(ctx context.Context, request *dieterv1.Con
 	return protoSCMCapabilities(capabilities), nil
 }
 
+// personMerges are the operations that merge into the base branch. Merging is
+// the person's: an agent turn prepares a pull request, a person merges it.
+var personMerges = map[string]bool{"merge_pr": true, "merge_local": true}
+
 func (api *gitAPI) StartGitOperation(ctx context.Context, request *dieterv1.StartGitOperationRequest) (*dieterv1.GitOperation, error) {
+	if personMerges[request.GetKind()] {
+		if _, _, agent, err := api.server.turnCaller(ctx); err != nil {
+			return nil, err
+		} else if agent {
+			return nil, fault.New(fault.PermissionDenied, "merging is the person's: an agent turn cannot run "+request.GetKind()+"; leave the pull request for them to merge")
+		}
+	}
 	ctx = kanban.WithCheckout(ctx, request.GetCheckoutId())
 	value, err := api.server.gitOperations.Start(ctx, operations.Request{
 		CardID: request.GetCardId(), ProjectID: request.GetProjectId(), Kind: request.GetKind(), ExpectedRevision: request.GetExpectedRevision(),
