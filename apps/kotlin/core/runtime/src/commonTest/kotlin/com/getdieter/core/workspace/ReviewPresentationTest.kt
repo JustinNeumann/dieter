@@ -194,7 +194,30 @@ class ReviewPresentationTest {
         assertTrue(running.operationCancelable)
         assertFalse(running.movesToDone, "an unfiled chat has no lane")
         assertNull(running.pullRequest)
-        assertEquals("This workspace conflicts with main", running.conflictTitle)
+        assertEquals("", running.conflictTitle, "no conflict, no banner")
+        val conflicted =
+            ReviewPresentation.of(
+                WorkspaceReviewView(
+                    cardId = "c",
+                    workspace = Workspace(base_branch = "main", state = "conflicted"),
+                ),
+                null,
+            )
+        assertEquals("This workspace conflicts with main", conflicted.conflictTitle)
+        val ready =
+            ReviewPresentation.of(
+                WorkspaceReviewView(
+                    cardId = "c",
+                    workspace = Workspace(base_branch = "main", state = "ready"),
+                    operation = GitOperation(kind = "update", status = "succeeded"),
+                ),
+                null,
+            )
+        assertEquals(
+            "",
+            ready.conflictTitle,
+            "a ready workspace after a finished update shows no banner",
+        )
         assertFalse(
             ReviewPresentation.of(
                     WorkspaceReviewView(operation = GitOperation(status = "succeeded")),

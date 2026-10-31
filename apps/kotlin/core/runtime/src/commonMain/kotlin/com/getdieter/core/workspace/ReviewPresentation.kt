@@ -189,7 +189,12 @@ data class ReviewPresentation(
                 operationVisible = GitOperations.visible(view.operation),
                 operationCancelable = GitOperations.cancelable(view.operation),
                 base = base,
-                conflictTitle = WorkspaceStatus.conflictTitle(conflicts.size, base),
+                // only while the workspace is conflicted: the page shows the banner whenever there
+                // is a title
+                conflictTitle =
+                    if (view.conflicted || conflicts.isNotEmpty())
+                        WorkspaceStatus.conflictTitle(conflicts.size, base)
+                    else "",
                 conflictPrompt = WorkspaceStatus.conflictPrompt(conflicts),
                 movesToDone = card != null && WorkspaceStatus.movesToDone(card),
                 pullRequest = PullRequests.view(card?.pull_request),
