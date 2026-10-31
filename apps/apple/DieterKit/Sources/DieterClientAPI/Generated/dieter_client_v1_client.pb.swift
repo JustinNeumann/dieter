@@ -3587,6 +3587,13 @@ public nonisolated struct ClientCreationIntent: @unchecked Sendable {
     set {_uniqueStorage()._mailAccess = newValue}
   }
 
+  /// Field numbers from 1001 are this fork's (JustinNeumann/dieter), clear of upstream's.
+  /// Agent turns may use Home Assistant (the add-on's hass-cli).
+  public var homeAssistantAccess: Bool {
+    get {_storage._homeAssistantAccess}
+    set {_uniqueStorage()._homeAssistantAccess = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -19081,7 +19088,7 @@ nonisolated extension ClientRememberCreation: SwiftProtobuf.Message, SwiftProtob
 
 nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".CreationIntent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}board_id\0\u{3}checkout_id\0\u{1}lane\0\u{1}title\0\u{1}prompt\0\u{1}attachments\0\u{1}selection\0\u{3}label_ids\0\u{3}workspace_mode\0\u{3}workspace_branch\0\u{3}workspace_base_branch\0\u{3}workspace_base_remote\0\u{3}remote_publish_mode\0\u{3}vault_access\0\u{3}mail_access\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}project_id\0\u{3}board_id\0\u{3}checkout_id\0\u{1}lane\0\u{1}title\0\u{1}prompt\0\u{1}attachments\0\u{1}selection\0\u{3}label_ids\0\u{3}workspace_mode\0\u{3}workspace_branch\0\u{3}workspace_base_branch\0\u{3}workspace_base_remote\0\u{3}remote_publish_mode\0\u{3}vault_access\0\u{3}mail_access\0\u{4}Y\u{f}home_assistant_access\0")
 
   fileprivate class _StorageClass {
     var _projectID: String = String()
@@ -19100,6 +19107,7 @@ nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf
     var _remotePublishMode: String = String()
     var _vaultAccess: Bool = false
     var _mailAccess: Bool = false
+    var _homeAssistantAccess: Bool = false
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -19126,6 +19134,7 @@ nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf
       _remotePublishMode = source._remotePublishMode
       _vaultAccess = source._vaultAccess
       _mailAccess = source._mailAccess
+      _homeAssistantAccess = source._homeAssistantAccess
     }
   }
 
@@ -19160,6 +19169,7 @@ nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf
         case 14: try { try decoder.decodeSingularStringField(value: &_storage._remotePublishMode) }()
         case 15: try { try decoder.decodeSingularBoolField(value: &_storage._vaultAccess) }()
         case 16: try { try decoder.decodeSingularBoolField(value: &_storage._mailAccess) }()
+        case 1001: try { try decoder.decodeSingularBoolField(value: &_storage._homeAssistantAccess) }()
         default: break
         }
       }
@@ -19220,6 +19230,9 @@ nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf
       if _storage._mailAccess != false {
         try visitor.visitSingularBoolField(value: _storage._mailAccess, fieldNumber: 16)
       }
+      if _storage._homeAssistantAccess != false {
+        try visitor.visitSingularBoolField(value: _storage._homeAssistantAccess, fieldNumber: 1001)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -19245,6 +19258,7 @@ nonisolated extension ClientCreationIntent: SwiftProtobuf.Message, SwiftProtobuf
         if _storage._remotePublishMode != rhs_storage._remotePublishMode {return false}
         if _storage._vaultAccess != rhs_storage._vaultAccess {return false}
         if _storage._mailAccess != rhs_storage._mailAccess {return false}
+        if _storage._homeAssistantAccess != rhs_storage._homeAssistantAccess {return false}
         return true
       }
       if !storagesAreEqual {return false}

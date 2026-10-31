@@ -216,6 +216,19 @@ public enum Dieter_V1_CardService: Sendable {
                 type: .unary
             )
         }
+        /// Namespace for "GetTurnCaller" metadata.
+        public enum GetTurnCaller: Sendable {
+            /// Request type for "GetTurnCaller".
+            public typealias Input = SwiftProtobuf.Google_Protobuf_Empty
+            /// Response type for "GetTurnCaller".
+            public typealias Output = Dieter_V1_TurnCaller
+            /// Descriptor for "GetTurnCaller".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "dieter.v1.CardService"),
+                method: "GetTurnCaller",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "dieter.v1.CardService" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
             ListArchivedCards.descriptor,
@@ -232,7 +245,8 @@ public enum Dieter_V1_CardService: Sendable {
             RenameCard.descriptor,
             UpdateCard.descriptor,
             ArchiveCard.descriptor,
-            PinChat.descriptor
+            PinChat.descriptor,
+            GetTurnCaller.descriptor
         ]
     }
 }
@@ -551,6 +565,31 @@ extension Dieter_V1_CardService {
             deserializer: some GRPCCore.MessageDeserializer<Dieter_V1_Card>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Dieter_V1_Card>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "GetTurnCaller" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > GetTurnCaller names the conversation of the agent turn whose token the
+        /// > call carries and what it may use; a call without a live turn token is
+        /// > refused. A host's services check an agent's token with it.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `SwiftProtobuf.Google_Protobuf_Empty` message.
+        ///   - serializer: A serializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
+        ///   - deserializer: A deserializer for `Dieter_V1_TurnCaller` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response and returns its result to
+        ///       the caller. Returning from the closure will cancel the RPC if it hasn't
+        ///       already finished.
+        /// - Returns: The result of `handleResponse`.
+        func getTurnCaller<Result>(
+            request: GRPCCore.ClientRequest<SwiftProtobuf.Google_Protobuf_Empty>,
+            serializer: some GRPCCore.MessageSerializer<SwiftProtobuf.Google_Protobuf_Empty>,
+            deserializer: some GRPCCore.MessageDeserializer<Dieter_V1_TurnCaller>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Dieter_V1_TurnCaller>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -1035,6 +1074,42 @@ extension Dieter_V1_CardService {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "GetTurnCaller" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > GetTurnCaller names the conversation of the agent turn whose token the
+        /// > call carries and what it may use; a call without a live turn token is
+        /// > refused. A host's services check an agent's token with it.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `SwiftProtobuf.Google_Protobuf_Empty` message.
+        ///   - serializer: A serializer for `SwiftProtobuf.Google_Protobuf_Empty` messages.
+        ///   - deserializer: A deserializer for `Dieter_V1_TurnCaller` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response and returns its result to
+        ///       the caller. Returning from the closure will cancel the RPC if it hasn't
+        ///       already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func getTurnCaller<Result>(
+            request: GRPCCore.ClientRequest<SwiftProtobuf.Google_Protobuf_Empty>,
+            serializer: some GRPCCore.MessageSerializer<SwiftProtobuf.Google_Protobuf_Empty>,
+            deserializer: some GRPCCore.MessageDeserializer<Dieter_V1_TurnCaller>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Dieter_V1_TurnCaller>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: Dieter_V1_CardService.Method.GetTurnCaller.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -1423,6 +1498,37 @@ extension Dieter_V1_CardService.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<Dieter_V1_PinChatRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<Dieter_V1_Card>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetTurnCaller" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > GetTurnCaller names the conversation of the agent turn whose token the
+    /// > call carries and what it may use; a call without a live turn token is
+    /// > refused. A host's services check an agent's token with it.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `SwiftProtobuf.Google_Protobuf_Empty` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response and returns its result to
+    ///       the caller. Returning from the closure will cancel the RPC if it hasn't
+    ///       already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getTurnCaller<Result>(
+        request: GRPCCore.ClientRequest<SwiftProtobuf.Google_Protobuf_Empty>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Dieter_V1_TurnCaller>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.getTurnCaller(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<SwiftProtobuf.Google_Protobuf_Empty>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<Dieter_V1_TurnCaller>(),
             options: options,
             onResponse: handleResponse
         )
@@ -1873,6 +1979,41 @@ extension Dieter_V1_CardService.ClientProtocol {
             metadata: metadata
         )
         return try await self.pinChat(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "GetTurnCaller" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > GetTurnCaller names the conversation of the agent turn whose token the
+    /// > call carries and what it may use; a call without a live turn token is
+    /// > refused. A host's services check an agent's token with it.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response and returns its result to
+    ///       the caller. Returning from the closure will cancel the RPC if it hasn't
+    ///       already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func getTurnCaller<Result>(
+        _ message: SwiftProtobuf.Google_Protobuf_Empty,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<Dieter_V1_TurnCaller>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<SwiftProtobuf.Google_Protobuf_Empty>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.getTurnCaller(
             request: request,
             options: options,
             onResponse: handleResponse
