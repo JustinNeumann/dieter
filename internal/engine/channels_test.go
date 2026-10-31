@@ -353,6 +353,18 @@ func TestChannelClaimsHoldWritersAndReleaseWakesThem(t *testing.T) {
 	if output, _ := service.HandleChannelHook(ChannelCaller{CardID: waiter.ID}, []byte(`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"go test ./..."}}`)); len(output) != 0 {
 		t.Fatalf("a read-only command got an opinion: %s", output)
 	}
+	// Antigravity's PreToolUse hook payload uses toolCall.{name,args} with PascalCase keys and expects {decision,reason}.
+	agyOut, err := service.HandleChannelHook(ChannelCaller{CardID: waiter.ID}, []byte(`{"toolCall":{"name":"edit_file","args":{"Path":"src/module3.js"}}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var agyDecision struct {
+		Decision string `json:"decision"`
+		Reason   string `json:"reason"`
+	}
+	if json.Unmarshal(agyOut, &agyDecision) != nil || agyDecision.Decision != "deny" || !strings.Contains(agyDecision.Reason, holder.ID) {
+		t.Fatalf("antigravity hook output = %s", agyOut)
+	}
 	// The holder hears that someone waits, once.
 	waitSteer(t, runner, "wants to change src/module3.js")
 	if _, err := service.HandleChannelHook(ChannelCaller{CardID: waiter.ID}, []byte(event)); err != nil {
@@ -459,6 +471,10 @@ func TestChannelWritePathsAndRendering(t *testing.T) {
 	}{
 		{"edit", raw(map[string]string{"file_path": filepath.Join(workspace, "src/app.go")}), "src/app.go"},
 		{"Write", raw(map[string]string{"file_path": "docs/new.md"}), "docs/new.md"},
+		{"write_file", raw(map[string]string{"Path": filepath.Join(workspace, "src/app.go")}), "src/app.go"},
+		{"edit_file", raw(map[string]string{"Path": "src/app.go"}), "src/app.go"},
+		{"run_command", raw(map[string]string{"CommandLine": "echo '// agy' >> src/app.go"}), "src/app.go"},
+		{"run_command", raw(map[string]string{"CommandLine": "cat src/app.go"}), ""},
 		{"fileChange", raw(map[string]string{"event": "modify", "path": "src/app.go"}), "src/app.go"},
 		{"apply_patch", raw(map[string]string{"command": "*** Begin Patch\n*** Add File: a/b.txt\n*** Update File: src/app.go\n*** Move to: src/new.go\n*** End Patch"}), "a/b.txt,src/app.go,src/new.go"},
 		{"Bash", raw(map[string]string{"command": "sed -i '' 's/a/b/' src/app.go && go test ./..."}), "src/app.go"},

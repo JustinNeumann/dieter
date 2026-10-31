@@ -54,7 +54,7 @@ jobs:
           category: /language:${{ matrix.language }}
 
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !github.event.repository.fork
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
