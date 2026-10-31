@@ -343,6 +343,30 @@ func TestParseClaudeHelpUsesAdvertisedAliasesAndEfforts(t *testing.T) {
 	}
 }
 
+func TestParseAntigravityModelsStripsSpinnerAndExtractsLevelsAndWindows(t *testing.T) {
+	modelsOut := []byte("\r⠋ Fetching available models...\r⠙ Fetching available models...\rgemini-3.8-flash-high     Gemini 3.8 Flash (High)\nclaude-opus-5-5-low       Claude Opus 5.5 (Low)\ngpt-oss-120b-medium       GPT-OSS 120B (Medium)\ngemini-4-argon            Gemini 4 Argon\n")
+	helpOut := []byte("  --effort  Reasoning effort for the current CLI session (low|medium|high|xhigh|max)\n")
+	models, err := parseAntigravityModels(modelsOut, helpOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 4 {
+		t.Fatalf("unexpected models count: %#v", models)
+	}
+	if models[0].ID != "gemini-3.8-flash-high" || models[0].Name != "Gemini 3.8 Flash (High)" || models[0].ContextWindow != 1048576 || models[0].DefaultEffort != "high" || strings.Join(models[0].Efforts, ",") != "high" {
+		t.Fatalf("unexpected gemini flash model: %#v", models[0])
+	}
+	if models[1].ID != "claude-opus-5-5-low" || models[1].ContextWindow != 200000 || models[1].DefaultEffort != "low" || strings.Join(models[1].Efforts, ",") != "low" {
+		t.Fatalf("unexpected claude model: %#v", models[1])
+	}
+	if models[2].ID != "gpt-oss-120b-medium" || models[2].ContextWindow != 131072 || models[2].DefaultEffort != "medium" || strings.Join(models[2].Efforts, ",") != "medium" {
+		t.Fatalf("unexpected gpt-oss model: %#v", models[2])
+	}
+	if models[3].ID != "gemini-4-argon" || models[3].ContextWindow != 1048576 || models[3].DefaultEffort != "" || strings.Join(models[3].Efforts, ",") != "low,medium,high,xhigh,max" {
+		t.Fatalf("unexpected base gemini model: %#v", models[3])
+	}
+}
+
 func TestMergeDiscoveredCatalogHidesCompatibilityModels(t *testing.T) {
 	adapter := Adapter{ID: "pi", DefaultModel: "default", Models: []Model{{ID: "default"}, {ID: "old"}}}
 	merged := mergeDiscoveredAdapter(adapter, []Model{{ID: "local/current", Efforts: []string{"low"}}})

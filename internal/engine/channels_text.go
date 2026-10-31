@@ -152,10 +152,10 @@ func channelWritePaths(toolName string, input json.RawMessage, workspace string)
 	}
 	var candidates []string
 	switch strings.ToLower(toolName) {
-	case "edit", "write", "multiedit", "notebookedit", "str_replace_based_edit_tool":
-		candidates = append(candidates, text("file_path"), text("notebook_path"), text("path"))
+	case "edit", "write", "write_file", "edit_file", "multiedit", "notebookedit", "str_replace_based_edit_tool":
+		candidates = append(candidates, text("file_path"), text("notebook_path"), text("path"), text("Path"), text("filePath"))
 	case "filechange":
-		candidates = append(candidates, text("path"))
+		candidates = append(candidates, text("path"), text("Path"))
 	case "apply_patch", "applypatch":
 		patch := text("command")
 		if patch == "" {
@@ -167,10 +167,13 @@ func channelWritePaths(toolName string, input json.RawMessage, workspace string)
 		for _, match := range patchFile.FindAllStringSubmatch(patch, -1) {
 			candidates = append(candidates, match[1], match[2])
 		}
-	case "bash", "shell", "exec_command", "local_shell", "exec":
+	case "bash", "shell", "exec_command", "local_shell", "exec", "run_command":
 		command := text("command")
 		if command == "" {
 			command = text("cmd")
+		}
+		if command == "" {
+			command = text("CommandLine")
 		}
 		if command == "" {
 			command = string(input)

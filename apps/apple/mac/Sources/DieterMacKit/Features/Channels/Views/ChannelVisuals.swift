@@ -35,11 +35,12 @@ enum ChannelStyle {
         }
     }
 
-    /// The harness mark on an avatar: Codex and Claude have their own.
+    /// The harness mark on an avatar: Codex, Claude, and Antigravity have their own.
     static func harnessSymbol(_ harness: String) -> String? {
         let harness = harness.lowercased()
         if harness.contains("codex") || harness.contains("openai") { return "sparkles" }
         if harness.contains("claude") { return "brain.head.profile" }
+        if harness.contains("antigravity") || harness.contains("gemini") { return "bolt.fill" }
         return harness.isEmpty ? nil : "cpu"
     }
 
@@ -47,6 +48,7 @@ enum ChannelStyle {
         let harness = harness.lowercased()
         if harness.contains("codex") || harness.contains("openai") { return DieterTheme.openAIQuota }
         if harness.contains("claude") { return DieterTheme.amber }
+        if harness.contains("antigravity") || harness.contains("gemini") { return DieterTheme.running }
         return DieterTheme.subtle
     }
 

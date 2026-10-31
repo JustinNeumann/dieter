@@ -247,6 +247,8 @@ func (c *Catalog) discoverModels(ctx context.Context, provider string) ([]Model,
 		return c.discoverOMPModels(ctx)
 	case "dsh":
 		return c.discoverDSHModels(ctx)
+	case "antigravity":
+		return c.discoverAntigravityModels(ctx)
 	default:
 		return nil, fmt.Errorf("no discovery integration for %s", provider)
 	}
@@ -334,8 +336,13 @@ func mergeDiscoveredAdapter(adapter Adapter, visible []Model) Adapter {
 	efforts := map[string]bool{}
 	for index := range visible {
 		model := &visible[index]
-		if configuredModel, ok := configured[model.ID]; ok && configuredModel.DefaultEffort != "" && supportsEffort(*model, configuredModel.DefaultEffort) {
-			model.DefaultEffort = configuredModel.DefaultEffort
+		if configuredModel, ok := configured[model.ID]; ok {
+			if configuredModel.DefaultEffort != "" && supportsEffort(*model, configuredModel.DefaultEffort) {
+				model.DefaultEffort = configuredModel.DefaultEffort
+			}
+			if model.ContextWindow == 0 && configuredModel.ContextWindow > 0 {
+				model.ContextWindow = configuredModel.ContextWindow
+			}
 		}
 		known[model.ID] = true
 		for _, effort := range model.Efforts {
@@ -368,6 +375,8 @@ func mergeDiscoveredAdapter(adapter Adapter, visible []Model) Adapter {
 	label := "Thinking"
 	if adapter.ID == "codex" {
 		label = "Reasoning"
+	} else if adapter.ID == "antigravity" {
+		label = "Effort"
 	}
 	adapter.Effort = &EffortConfig{Label: label, Options: options}
 	return adapter
@@ -485,7 +494,91 @@ var (
 	claudeEffortPattern = regexp.MustCompile(`(?s)--effort <level>.*?\(([^)]+)\)`)
 	claudeAliasPattern  = regexp.MustCompile(`(?s)--model <model>.*?\(e\.g\.\s*(.*?)\)\s*or a`)
 	quotedValuePattern  = regexp.MustCompile(`'([^']+)'`)
+	agyEffortPattern    = regexp.MustCompile(`--effort\s+.*?\(([a-z|]+)\)`)
+	agyModelLinePattern = regexp.MustCompile(`^([a-z0-9][a-z0-9._-]*)\s{2,}(.+)$`)
 )
+
+func (c *Catalog) discoverAntigravityModels(ctx context.Context) ([]Model, error) {
+	modelsOut, err := c.runDiscovery(ctx, "agy", "models")
+	if err != nil {
+		return nil, err
+	}
+	helpOut, _ := c.runDiscovery(ctx, "agy", "--help")
+	return parseAntigravityModels(modelsOut, helpOut)
+}
+
+func parseAntigravityModels(modelsData, helpData []byte) ([]Model, error) {
+	efforts := []string{"low", "medium", "high", "xhigh", "max"}
+	if match := agyEffortPattern.FindStringSubmatch(string(helpData)); len(match) > 1 {
+		parsed := []string{}
+		for _, value := range strings.Split(match[1], "|") {
+			if value = strings.TrimSpace(value); value != "" {
+				parsed = append(parsed, value)
+			}
+		}
+		if len(parsed) > 0 {
+			efforts = parsed
+		}
+	}
+	models := []Model{}
+	seen := map[string]bool{}
+	scanner := bufio.NewScanner(bytes.NewReader(modelsData))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if cr := strings.LastIndexByte(line, '\r'); cr >= 0 {
+			line = line[cr+1:]
+		}
+		line = strings.TrimSpace(line)
+		match := agyModelLinePattern.FindStringSubmatch(line)
+		if len(match) != 3 {
+			continue
+		}
+		id, name := strings.TrimSpace(match[1]), strings.TrimSpace(match[2])
+		if id == "" || name == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		model := Model{
+			ID:            id,
+			Name:          name,
+			ContextWindow: antigravityModelContextWindow(id),
+		}
+		switch {
+		case strings.HasSuffix(id, "-low"):
+			model.DefaultEffort = "low"
+			model.Efforts = []string{"low"}
+		case strings.HasSuffix(id, "-medium"):
+			model.DefaultEffort = "medium"
+			model.Efforts = []string{"medium"}
+		case strings.HasSuffix(id, "-high"):
+			model.DefaultEffort = "high"
+			model.Efforts = []string{"high"}
+		default:
+			model.Efforts = append([]string(nil), efforts...)
+		}
+		models = append(models, model)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if len(models) == 0 {
+		return nil, fmt.Errorf("agy models returned no models")
+	}
+	return models, nil
+}
+
+func antigravityModelContextWindow(id string) int {
+	switch {
+	case strings.HasPrefix(id, "gemini-"):
+		return 1048576
+	case strings.HasPrefix(id, "claude-"):
+		return 200000
+	case strings.HasPrefix(id, "gpt-oss-"):
+		return 131072
+	default:
+		return 0
+	}
+}
 
 func parseClaudeHelp(data []byte) ([]Model, error) {
 	text := string(data)

@@ -111,8 +111,7 @@ func TestCatalogIncludesEverySupportedHarness(t *testing.T) {
 		if !found || adapter.DefaultModel == "" || len(adapter.Models) == 0 {
 			t.Errorf("harness %q is incomplete: %#v", id, adapter)
 		}
-		// Antigravity (agy) runs one headless turn at a time and has no task-plan channel.
-		if id != "antigravity" && !hasCapability(adapter, "task-plan") {
+		if !hasCapability(adapter, "task-plan") {
 			t.Errorf("harness %q does not advertise task plans: %#v", id, adapter.Capabilities)
 		}
 	}
@@ -129,6 +128,27 @@ func TestCatalogIncludesDeepSeekHarnessACPWithConfiguredDefaultFallback(t *testi
 	}
 	if adapter.Effort != nil {
 		t.Fatalf("dsh effort=%#v", adapter.Effort)
+	}
+}
+
+func TestCatalogIncludesAntigravityWithContextWindowsAndFixedModelEfforts(t *testing.T) {
+	adapter, valid := StaticCatalog(false).ResolveAdapter("antigravity")
+	if !valid || adapter.Runtime != "antigravity" || adapter.DefaultModel != "gemini-3.8-flash-high" || len(adapter.Models) != 13 {
+		t.Fatalf("antigravity catalog=%#v valid=%v", adapter, valid)
+	}
+	if !hasCapability(adapter, "subagents") || !hasCapability(adapter, "task-plan") {
+		t.Fatalf("antigravity capabilities=%#v", adapter.Capabilities)
+	}
+	for _, model := range adapter.Models {
+		if model.ContextWindow <= 0 || model.DefaultEffort == "" || len(model.Efforts) != 1 || model.Efforts[0] != model.DefaultEffort {
+			t.Fatalf("antigravity model %q missing contextWindow or fixed effort: %#v", model.ID, model)
+		}
+		if _, err := ResolveEffort(adapter, model, model.DefaultEffort); err != nil {
+			t.Fatalf("antigravity model %q default effort rejected: %v", model.ID, err)
+		}
+		if _, err := ResolveEffort(adapter, model, "xhigh"); err == nil {
+			t.Fatalf("antigravity pre-suffixed model %q accepted mismatched xhigh effort", model.ID)
+		}
 	}
 }
 

@@ -703,7 +703,7 @@ private fun harnessColor(harness: String): Color =
     when {
         harness.startsWith("claude") -> Color(0xFFD97757)
         harness.startsWith("codex") -> Color(0xFF10A37F)
-        harness.startsWith("gemini") -> Color(0xFF4285F4)
+        harness.startsWith("antigravity") || harness.startsWith("gemini") -> Color(0xFF4285F4)
         harness.startsWith("opencode") -> Color(0xFF5E5CE6)
         else -> Color(0xFF8E8E93)
     }

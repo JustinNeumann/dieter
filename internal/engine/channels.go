@@ -734,9 +734,32 @@ func (s *Service) HandleChannelHook(caller ChannelCaller, event []byte) ([]byte,
 		Event     string          `json:"hook_event_name"`
 		ToolName  string          `json:"tool_name"`
 		ToolInput json.RawMessage `json:"tool_input"`
+		ToolCall  struct {
+			Name string          `json:"name"`
+			Args json.RawMessage `json:"args"`
+		} `json:"toolCall"`
 	}
-	if json.Unmarshal(event, &input) != nil || input.Event != "PreToolUse" {
+	if json.Unmarshal(event, &input) != nil {
 		return nil, nil
+	}
+	toolName := input.ToolName
+	toolInput := input.ToolInput
+	antigravityHook := false
+	if input.Event != "PreToolUse" {
+		if input.ToolCall.Name == "" {
+			return nil, nil
+		}
+		toolName = input.ToolCall.Name
+		toolInput = input.ToolCall.Args
+		antigravityHook = true
+	}
+	deny := func(reason string) ([]byte, error) {
+		if antigravityHook {
+			return json.Marshal(map[string]string{"decision": "deny", "reason": reason})
+		}
+		return json.Marshal(map[string]any{"hookSpecificOutput": map[string]string{
+			"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason,
+		}})
 	}
 	s.mu.Lock()
 	active := s.active[caller.CardID]
@@ -749,14 +772,12 @@ func (s *Service) HandleChannelHook(caller ChannelCaller, event []byte) ([]byte,
 		return nil, nil
 	}
 	s.expireParkedClaims()
-	if claim, files, swept := s.commitSweep(caller.CardID, channel.workspace, input.ToolName, input.ToolInput); swept {
+	if claim, files, swept := s.commitSweep(caller.CardID, channel.workspace, toolName, toolInput); swept {
 		s.notifyHolder(claim, caller.CardID, channel.title)
 		reason := fmt.Sprintf("Dieter agent channels: this commit would include %s, which agent %s ('%s') is changing in this shared checkout. Commit only your own files with explicit paths: git commit -m \"MESSAGE\" -- FILE...", strings.Join(files, ", "), claim.CardID, channelAttribute(claim.CardTitle))
-		return json.Marshal(map[string]any{"hookSpecificOutput": map[string]string{
-			"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason,
-		}})
+		return deny(reason)
 	}
-	paths := channelWritePaths(input.ToolName, input.ToolInput, channel.workspace)
+	paths := channelWritePaths(toolName, toolInput, channel.workspace)
 	if len(paths) == 0 {
 		return nil, nil
 	}
@@ -766,9 +787,7 @@ func (s *Service) HandleChannelHook(caller ChannelCaller, event []byte) ([]byte,
 	}
 	s.notifyHolder(claim, caller.CardID, channel.title)
 	reason := fmt.Sprintf("Dieter agent channels: %s is being changed by agent %s ('%s') for %s. Do the other parts of your task first. If nothing else is left, end your turn with a one-line status; you will be woken when %s is free. Do not poll or sleep. You can message them with: %s channel post --to %s \"...\"", claim.Path, claim.CardID, channelAttribute(claim.CardTitle), heldFor(claim), claim.Path, s.CLIWord(), claim.CardID)
-	return json.Marshal(map[string]any{"hookSpecificOutput": map[string]string{
-		"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": reason,
-	}})
+	return deny(reason)
 }
 
 // commitSweep reports a shell `git commit` without paths whose commit would
@@ -776,7 +795,7 @@ func (s *Service) HandleChannelHook(caller ChannelCaller, event []byte) ([]byte,
 // modified tracked file of the shared index.
 func (s *Service) commitSweep(cardID, workspace, toolName string, toolInput json.RawMessage) (model.ChannelClaim, []string, bool) {
 	switch strings.ToLower(toolName) {
-	case "bash", "shell", "exec_command", "local_shell", "exec":
+	case "bash", "shell", "exec_command", "local_shell", "exec", "run_command":
 	default:
 		return model.ChannelClaim{}, nil, false
 	}
@@ -786,6 +805,9 @@ func (s *Service) commitSweep(cardID, workspace, toolName string, toolInput json
 	_ = json.Unmarshal(fields["command"], &command)
 	if command == "" {
 		_ = json.Unmarshal(fields["cmd"], &command)
+	}
+	if command == "" {
+		_ = json.Unmarshal(fields["CommandLine"], &command)
 	}
 	match := gitCommit.FindStringIndex(command)
 	if match == nil || workspace == "" {
