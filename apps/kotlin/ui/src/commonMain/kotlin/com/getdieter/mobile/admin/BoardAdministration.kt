@@ -335,8 +335,12 @@ internal fun ArchivedCards(store: MobileStore, boardId: String, dismiss: () -> U
                         "Restore",
                         {
                             store.action {
+                                // with its board: a restore without one is a chat's
                                 store.core.dispatch(
-                                    Command(restore_card = RestoreCard(card_id = card.id))
+                                    Command(
+                                        restore_card =
+                                            RestoreCard(card_id = card.id, board_id = boardId)
+                                    )
                                 )
                                 cards = cards.filter { it.id != card.id }
                             }

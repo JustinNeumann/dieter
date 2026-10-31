@@ -65,6 +65,7 @@ import com.getdieter.client.v1.Reconnect
 import com.getdieter.client.v1.RememberCreation
 import com.getdieter.client.v1.RemoveGateway
 import com.getdieter.client.v1.RenameCard
+import com.getdieter.client.v1.RestoreCard
 import com.getdieter.client.v1.Resync
 import com.getdieter.client.v1.RetryFailedTurn
 import com.getdieter.client.v1.SaveSchedule
@@ -1262,6 +1263,18 @@ class ClientApiEndToEndTest : EndToEnd() {
                 .cards!!
                 .cards
         assertTrue(archived.any { it.id == todoId })
+        // A board's archived card comes back with its board; without one the core looks among
+        // archived chats.
+        assertFailsWith<ClientFailure> {
+            api.dispatch(Command(restore_card = RestoreCard(card_id = todoId)))
+        }
+        step(
+            "restore",
+            Command(restore_card = RestoreCard(card_id = todoId, board_id = fixture.boardId)),
+        )
+        mirror.workspace.await(describe = { "restored" }) { slice ->
+            slice?.cards?.any { it.id == todoId } == true
+        }
     }
 
     private suspend fun Contract.chat(session: SessionSlice): Pair<String, ClientSubscription> {
