@@ -1,5 +1,3 @@
-@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-
 package com.getdieter.mobile.workspace
 
 import androidx.compose.animation.core.LinearEasing
@@ -9,9 +7,11 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -72,8 +72,9 @@ internal fun InboxScreen(store: MobileStore) {
     fun count(value: InboxFilter) = scoped.count { it.matches(value) }
     val rows = scoped.filter { it.matches(filter) }
     val bars =
-        quotas.group_rows.filter { it.lowest_remaining >= 0 }.map { UsageBar(it.provider_name, it.lowest_remaining) } +
-            extensions.usageBars(store)
+        quotas.group_rows
+            .filter { it.lowest_remaining >= 0 }
+            .map { UsageBar(it.provider_name, it.lowest_remaining) } + extensions.usageBars(store)
     val running = view.summary?.running ?: 0
     val attention = view.summary?.attention ?: 0
     val projectName = workspace.projects.firstOrNull { it.id == project }?.name
@@ -167,11 +168,12 @@ internal fun InboxScreen(store: MobileStore) {
                     )
                 }
                 item("filters") {
-                    // narrow panes wrap the filters rather than cutting the last one off
-                    FlowRow(
-                        Modifier.fillMaxWidth().padding(horizontal = ScreenMargin, vertical = 6.dp),
+                    // one line: a pane too narrow for all of them scrolls the filters sideways
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = ScreenMargin, vertical = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         InboxFilter.entries.forEach { value ->
                             val total = count(value)

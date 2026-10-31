@@ -99,8 +99,8 @@ class DieterSession(application: Application) : AndroidViewModel(application) {
                 RuntimeConfig(
                     BuildConfig.VERSION_NAME,
                     "${DistributionIdentity.ANDROID_URL_SCHEME}://oauth/callback",
-                    false,
-                    "android",
+                    includeLoopbackRoutes = false,
+                    clientIdPrefix = "android",
                 ),
             )
         store =
