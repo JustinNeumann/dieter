@@ -174,7 +174,7 @@ internal fun MailMessageScreen(
                             close()
                         }
                     },
-                ) + overflow("mail-message-more", menu),
+                ) + overflow("mail-message-more", menu, "Message actions"),
         )
     // A 128 KiB body parses off the main thread; inline trees parse as blocks show.
     val blocks by

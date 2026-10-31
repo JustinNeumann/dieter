@@ -35,18 +35,18 @@ import kotlin.time.Clock
 import kotlinx.coroutines.launch
 
 @Composable
-internal fun SchedulesScreen(store: MobileStore) {
+internal fun SchedulesScreen(store: MobileStore, projectId: String) {
     val view by store.schedules.slice.collectAsState()
     val workspace by store.workspace.slice.collectAsState()
     var editorId by remember { mutableStateOf<String?>(null) }
     var deleteId by remember { mutableStateOf("") }
     fun command(value: SchedulesCommand) =
         store.command(Command(schedules = value.copy(scope = MobileStore.SCHEDULES_SCOPE)))
-    fun rebind() = store.schedules.load(store.boards.currentProjectId())
+    fun rebind() = store.schedules.load(projectId)
     val scope = rememberCoroutineScope()
     val now = remember(view.run_rows) { Clock.System.now() }
     fun runAge(at: String) = Timestamps.parse(at)?.let { Ages.ago(it, now) } ?: at
-    val project = workspace.projects.firstOrNull { it.id == store.boards.currentProjectId() }
+    val project = workspace.projects.firstOrNull { it.id == projectId }
     Screen(
         ScreenChrome(
             "Schedules",
@@ -73,8 +73,18 @@ internal fun SchedulesScreen(store: MobileStore) {
                                     )
                                 ),
                                 MenuSection(
-                                    projectScopeMenu(store, store.schedules.allProjects, ::rebind)
-                                        .take(1)
+                                    listOf(
+                                        // the project's schedules, or every project's
+                                        ChromeAction(
+                                            "scope-project-all",
+                                            SchedulePresentations.ALL_PROJECTS,
+                                            Glyph.FOLDER,
+                                            checked = view.all_projects,
+                                        ) {
+                                            store.schedules.allProjects.value = !view.all_projects
+                                            rebind()
+                                        }
+                                    )
                                 ),
                             ),
                     ),
@@ -313,7 +323,7 @@ internal fun SchedulesScreen(store: MobileStore) {
         }
     }
     editorId?.let { id ->
-        ScheduleEditor(store, id) {
+        ScheduleEditor(store, id, projectId) {
             editorId = null
             command(SchedulesCommand(close_editor = Step()))
         }
@@ -333,7 +343,12 @@ internal fun SchedulesScreen(store: MobileStore) {
 }
 
 @Composable
-private fun ScheduleEditor(store: MobileStore, scheduleId: String, onDismiss: () -> Unit) {
+private fun ScheduleEditor(
+    store: MobileStore,
+    scheduleId: String,
+    toolsProject: String,
+    onDismiss: () -> Unit,
+) {
     val workspace by store.workspace.slice.collectAsState()
     val preview by store.creation.preview.collectAsState()
     val schedules by store.schedules.slice.collectAsState()
@@ -342,7 +357,7 @@ private fun ScheduleEditor(store: MobileStore, scheduleId: String, onDismiss: ()
     // A new schedule in the list of every project's starts in the tools' project and may move to
     // another before it is saved; what was typed so far comes along.
     val choosesProject = scheduleId.isEmpty() && schedules.all_projects
-    var projectId by remember(scheduleId) { mutableStateOf(store.boards.currentProjectId()) }
+    var projectId by remember(scheduleId) { mutableStateOf(toolsProject) }
     var carried by remember(scheduleId) { mutableStateOf<ScheduleDraft?>(null) }
     LaunchedEffect(scheduleId, projectId) {
         store.action {

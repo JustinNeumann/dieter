@@ -34,6 +34,7 @@ class MobileStore(
     val error = context.error
     val routes = MutableStateFlow(MobileNavigation())
     val theme: ThemeModel = ThemeModel(preferences)
+    val layout: LayoutModel = LayoutModel(preferences)
     val session: SessionModel = SessionModel(context)
     val workspace: WorkspaceModel =
         WorkspaceModel(
@@ -41,16 +42,23 @@ class MobileStore(
             changed = { sharing.deliver() },
             resolved = { conversation.follow(it) },
         )
-    val boards: BoardsModel = BoardsModel(context, workspace.slice)
+    val boards: BoardsModel = BoardsModel(context)
     val conversation: ConversationModel = ConversationModel(context, workspace.outbox)
     val creation: CreationModel =
         CreationModel(context, workspace.slice, workspace.outbox, boards, ::rebindProjectTool)
     val sharing: SharingModel = SharingModel(context, workspace.slice, creation, navigator)
-    val files: FilesModel = FilesModel(context, workspace.slice, boards, creation.defaults)
+    val files: FilesModel = FilesModel(context, workspace.slice, creation.defaults, ::available)
     val schedules: SchedulesModel = SchedulesModel(context)
-    val review: ReviewModel = ReviewModel(context, workspace.slice, boards, creation.defaults)
+    val review: ReviewModel = ReviewModel(context, workspace.slice, creation.defaults, ::available)
     val machines: MachinesModel = MachinesModel(context)
-    val terminals: TerminalsModel = TerminalsModel(context) { conversation.showsTerminal }
+    val terminals: TerminalsModel =
+        TerminalsModel(context) {
+            when (val top = routes.value.top) {
+                is MobileRoute.TerminalSession -> top.cardId.isNotEmpty()
+                is MobileRoute.Pane -> top.pane == CardPane.TERMINAL
+                else -> false
+            }
+        }
     val screens: ScreensModel = ScreensModel(context)
     val devices: DevicesModel = DevicesModel(context)
     val channels: ChannelsModel = ChannelsModel(context)
@@ -91,16 +99,27 @@ class MobileStore(
         val next =
             if (current.tab == value) current.with(value, listOf(MobileRoute.Root(value)))
             else current.copy(tab = value)
-        val last = lastProject().takeIf { value == MobileTab.PROJECTS && current.tab != value && next.stack.size == 1 }
-        routes.value = if (last == null) next else next.with(value, next.stack + MobileRoute.Project(last))
+        val last =
+            lastProject().takeIf {
+                value == MobileTab.PROJECTS && current.tab != value && next.stack.size == 1
+            }
+        routes.value =
+            if (last == null) next else next.with(value, next.stack + MobileRoute.Project(last))
         syncNavigation()
     }
 
-    /** The project last opened or created in on this device (the core's creation memory), if it still exists. */
+    /**
+     * The project last opened or created in on this device (the core's creation memory), if it
+     * still exists.
+     */
     fun lastProject(): String? =
-        creation.defaults.value.project_id.takeIf { id -> id.isNotEmpty() && workspace.slice.value.projects.any { it.id == id } }
+        creation.defaults.value.project_id.takeIf { id ->
+            id.isNotEmpty() && workspace.slice.value.projects.any { it.id == id }
+        }
 
-    /** Tells the core [projectId] was used: it leads the Projects list and New task preselects it. */
+    /**
+     * Tells the core [projectId] was used: it leads the Projects list and New task preselects it.
+     */
     internal fun useProject(projectId: String) {
         if (projectId.isNotEmpty() && projectId != creation.defaults.value.project_id)
             command(Command(remember_creation = RememberCreation(project_id = projectId)))
@@ -127,18 +146,35 @@ class MobileStore(
         syncNavigation()
     }
 
-    /** Opens [projectId]'s channel on the Channels tab, e.g. from a channel message in a turn. */
-    fun openChannel(projectId: String) {
+    /**
+     * Opens [route] in More, above the More page, as choosing it from the More sheet or page does.
+     */
+    fun openMore(route: MobileRoute) {
         val current = routes.value
-        routes.value =
-            current
-                .copy(tab = MobileTab.CHANNELS)
-                .with(
-                    MobileTab.CHANNELS,
-                    listOf(MobileRoute.Root(MobileTab.CHANNELS), MobileRoute.Channel(projectId)),
-                )
+        val stack = listOf(MobileRoute.Root(MobileTab.MORE), route)
+        if (current.tab == MobileTab.MORE && current.stack == stack) return
+        routes.value = current.copy(tab = MobileTab.MORE).with(MobileTab.MORE, stack)
         syncNavigation()
     }
+
+    /**
+     * Opens [projectId]'s channel above what is shown, e.g. from a channel message in a turn, so
+     * back returns to it.
+     */
+    fun openChannel(projectId: String) = push(MobileRoute.Channel(projectId))
+
+    /** The checkout a project tool route shows; see [toolCheckout]. */
+    fun toolCheckout(route: MobileRoute.Tool): com.getdieter.api.v1.Checkout? =
+        workspace.slice.value.projects
+            .firstOrNull { it.id == route.projectId }
+            ?.toolCheckout(
+                route.checkoutId,
+                creation.defaults.value.checkouts[route.projectId].orEmpty(),
+                ::available,
+            )
+
+    private fun available(daemonId: String) =
+        session.slice.value.machines.any { it.id == daemonId && it.available }
 
     /** Opens a conversation from a list, replacing any conversation already open after it. */
     fun openConversation(cardId: String) {
@@ -225,6 +261,8 @@ class MobileStore(
         screens.foreground(active)
         if (
             (routes.value.top as? MobileRoute.Tool)?.page == ToolPage.TERMINALS ||
+                routes.value.top is MobileRoute.Machine ||
+                routes.value.top is MobileRoute.TerminalSession ||
                 conversation.showsTerminal
         )
             terminals.foreground(active)
@@ -249,18 +287,20 @@ class MobileStore(
                 board as MobileRoute.Board
                 if (board.boardId != boards.selectedBoard.value) boards.chooseBoard(board.boardId)
             }
-        stack
-            .lastOrNull { it is MobileRoute.Project }
-            ?.let { project ->
-                project as MobileRoute.Project
-                if (project.projectId != boards.selectedProject.value)
-                    boards.selectProject(project.projectId)
-            }
         // the innermost of a conversation, board or project is the one in use
         (cardId?.let { id -> workspace.slice.value.cards.firstOrNull { it.id == id }?.project_id }
-                ?: boards.selectedProject.value.takeIf {
-                    stack.any { it is MobileRoute.Project || it is MobileRoute.Board }
-                })
+                ?: stack
+                    .lastOrNull { it is MobileRoute.Project || it is MobileRoute.Board }
+                    ?.let { route ->
+                        when (route) {
+                            is MobileRoute.Project -> route.projectId
+                            is MobileRoute.Board ->
+                                workspace.slice.value.boards
+                                    .firstOrNull { it.id == route.boardId }
+                                    ?.project_id
+                            else -> null
+                        }
+                    })
             ?.let(::useProject)
         if (cardId == null) {
             if (conversation.selectedCard.value.isNotEmpty()) conversation.unbind()
@@ -280,31 +320,33 @@ class MobileStore(
             screens.open(screen.machineId)
         machines.select((stack.lastOrNull() as? MobileRoute.Machine)?.machineId.orEmpty())
         channels.show((state.top as? MobileRoute.Channel)?.projectId)
-        // The message open in the Mail tab stays selected beneath a conversation it opened.
+        // The message open in Mail stays selected beneath a conversation it opened.
+        val more = state.stacks.getValue(MobileTab.MORE)
         mail.show(
-            state.stacks
-                .getValue(MobileTab.MAIL)
+            more
                 .lastOrNull { it is MobileRoute.MailMessage }
                 ?.let { it as MobileRoute.MailMessage }
                 ?.let { MailMessageRef(daemon_id = it.daemonId, id = it.id) }
         )
-        mail.setActive(state.tab == MobileTab.MAIL)
+        mail.setActive(state.tab == MobileTab.MORE && MobileRoute.Mailbox in more)
         val top = state.modal ?: state.top
         if (top.key == activeTop) return
         activeTop = top.key
         when (top) {
             is MobileRoute.Root ->
                 when (top.tab) {
-                    MobileTab.INBOX -> machines.loadQuotas()
-                    MobileTab.CHANNELS -> channels.refresh()
+                    // Inbox and More show the lowest provider quota.
+                    MobileTab.INBOX,
+                    MobileTab.MORE -> machines.loadQuotas()
                     else -> Unit
                 }
+            is MobileRoute.Channels -> channels.refresh()
+            // A machine's page lists its terminals.
+            is MobileRoute.Machine -> terminals.loadOverview()
             is MobileRoute.Tool -> {
-                if (top.projectId.isNotEmpty() && top.projectId != boards.selectedProject.value)
-                    boards.selectProject(top.projectId)
                 if (top.page == ToolPage.FILES && files.slice.value.directory.isNotEmpty())
                     files.command(FilesCommand(navigate = FilesPath("")))
-                activateTool(top.page)
+                activateTool(top)
             }
             is MobileRoute.Pane ->
                 if (top.pane == CardPane.FILES && files.slice.value.directory.isNotEmpty())
@@ -338,29 +380,34 @@ class MobileStore(
         val open = conversation.slice.value
         val cardId = conversation.selectedCard.value
         val projectId = open.card?.project_id.orEmpty()
-        if (value == "Processes")
-            review.bindProcesses(open.daemon_id, boards.currentProjectId(), cardId)
+        if (value == "Processes") review.bindProcesses(open.daemon_id, projectId, cardId)
         if (value == "Changes") review.bindCard(cardId, open.daemon_id)
         if (value == "Files") files.bindCard(open.daemon_id, projectId, cardId)
         if (value == "Terminal") terminals.bindCard(open.daemon_id, projectId, cardId)
     }
 
-    private fun activateTool(page: ToolPage) {
-        when (page) {
-            ToolPage.FILES -> files.bindProject()
-            ToolPage.CHANGES -> review.bindProjectChanges()
-            ToolPage.SCHEDULES -> schedules.load(boards.currentProjectId())
+    /** Binds a tool page to the scope its route carries. */
+    private fun activateTool(route: MobileRoute.Tool) {
+        when (route.page) {
+            ToolPage.FILES -> files.bindProject(route.projectId, route.checkoutId)
+            ToolPage.CHANGES -> review.bindProjectChanges(route.projectId, route.checkoutId)
+            ToolPage.SCHEDULES -> schedules.load(route.projectId)
             ToolPage.TERMINALS -> terminals.loadOverview()
             ToolPage.USAGE -> machines.loadQuotas()
             else -> Unit
         }
     }
 
-    /** New creation defaults can change the checkout a visible project tool shows. */
+    /**
+     * New creation defaults can change the checkout a visible project tool shows when its route
+     * names none.
+     */
     private fun rebindProjectTool() {
-        when ((routes.value.modal ?: routes.value.top).let { it as? MobileRoute.Tool }?.page) {
-            ToolPage.FILES -> files.bindProject()
-            ToolPage.CHANGES -> review.bindProjectChanges()
+        val route = (routes.value.modal ?: routes.value.top) as? MobileRoute.Tool ?: return
+        if (route.checkoutId.isNotEmpty()) return
+        when (route.page) {
+            ToolPage.FILES -> files.bindProject(route.projectId)
+            ToolPage.CHANGES -> review.bindProjectChanges(route.projectId)
             else -> Unit
         }
     }
@@ -373,6 +420,7 @@ class MobileStore(
         const val SCHEDULES_SCOPE = "mobile-schedules"
         const val REVIEW_SCOPE = "mobile-review"
         const val TERMINAL_SCOPE = "mobile-terminals"
+        const val TERMINAL_OVERVIEW_SCOPE = "mobile-terminal-overview"
         const val PROJECT_CHANGES_SCOPE = "mobile-project-changes"
         const val PROCESSES_SCOPE = "mobile-processes"
         const val SCREEN_SCOPE = "mobile-screen"
