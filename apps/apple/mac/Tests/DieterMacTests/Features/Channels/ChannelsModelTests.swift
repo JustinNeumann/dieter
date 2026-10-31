@@ -150,6 +150,7 @@ struct ChannelsModelTests {
     @Test func avatarsAndBadgesUseStableColours() {
         #expect(ChannelStyle.harnessSymbol("codex") == "sparkles")
         #expect(ChannelStyle.harnessSymbol("claude-code") == "brain.head.profile")
+        #expect(ChannelStyle.harnessSymbol("antigravity") == "bolt.fill")
         #expect(ChannelStyle.harnessSymbol("") == nil)
         #expect(ChannelStyle.avatarColor(3) == ChannelStyle.avatarColor(11))
         #expect(ChannelStyle.time(0).isEmpty)

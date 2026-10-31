@@ -167,6 +167,33 @@ class LiveActivityTest {
             "Reading README.md",
             label("mcp__files__read_file", """{"path":"/repo/README.md"}"""),
         )
+        assertEquals(
+            "Reading harnesses.yaml",
+            label("read_file", """{"Path":"/repo/internal/harness/catalog/harnesses.yaml"}"""),
+        )
+        assertEquals(
+            "Editing antigravity-runtime.mjs",
+            label("edit_file", """{"Path":"/repo/internal/harness/runtime/antigravity-runtime.mjs"}"""),
+        )
+        assertEquals(
+            "Running node --test antigravity-runtime.test.mjs",
+            label(
+                "run_command",
+                """{"CommandLine":"node --test antigravity-runtime.test.mjs","toolSummary":"Run adapter tests"}""",
+            ),
+        )
+        assertEquals(
+            "Searching channelWritePaths",
+            label("grep_search", """{"Query":"channelWritePaths","SearchPath":"/repo"}"""),
+        )
+        assertEquals(
+            "Searching *.mjs",
+            label("find_by_name", """{"Pattern":"*.mjs","SearchDirectory":"/repo"}"""),
+        )
+        assertEquals(
+            "Searching Antigravity CLI flags",
+            label("search_web", """{"query":"Antigravity CLI flags"}"""),
+        )
         assertEquals("Using get issue…", label("mcp__github__get_issue", """{"id":1}"""))
         assertEquals("Waiting for command…", label("write_stdin", "{}"))
         assertEquals("Running command…", label("bash", "{not json"))

@@ -164,7 +164,7 @@ export function createSubagentCapabilityCollector({ provider, adapter = provider
   function consumeUIChunk(chunk) {
     if (!chunk || typeof chunk !== 'object') return;
     const id = chunk.toolCallId;
-    if (adapter === 'claude-code' && chunk.type === 'tool-input-available' && id && chunk.toolName) {
+    if ((adapter === 'claude-code' || adapter === 'antigravity') && chunk.type === 'tool-input-available' && id && chunk.toolName) {
       claudeToolNames.set(id, String(chunk.toolName));
     }
     const resolvedToolName = chunk.toolName || claudeToolNames.get(id) || '';
@@ -216,8 +216,35 @@ export function createSubagentCapabilityCollector({ provider, adapter = provider
       emitClaudeTasks();
       return;
     }
-    if (adapter === 'pi' && chunk.type === 'tool-input-available' && toolName === 'board_task_plan') {
+    if ((adapter === 'pi' || adapter === 'antigravity') && chunk.type === 'tool-input-available' && toolName === 'board_task_plan') {
       replaceTaskPlan({ tasks: chunk.input?.tasks, explanation: chunk.input?.explanation, source: 'board_task_plan' });
+      return;
+    }
+    if (adapter === 'antigravity' && toolName === 'invoke_subagent' && id) {
+      if (chunk.type === 'tool-input-available') {
+        const input = chunk.input && typeof chunk.input === 'object' ? chunk.input : {};
+        const model = input.Model && input.Model !== 'inherit' ? String(input.Model) : undefined;
+        upsert(id, {
+          parentToolCallId: id,
+          name: input.Role || input.TypeName || 'Subagent',
+          agentType: input.TypeName || 'Subagent',
+          description: input.Role || '',
+          task: input.Prompt || '',
+          ...(model ? { model } : {}),
+          status: 'running',
+        });
+      } else if (chunk.type === 'tool-output-available') {
+        const output = chunk.output && typeof chunk.output === 'object' && 'output' in chunk.output ? chunk.output.output : chunk.output;
+        upsert(id, {
+          status: 'completed',
+          recentOutput: compactLines(output),
+        });
+      } else if (chunk.type === 'tool-output-error') {
+        upsert(id, {
+          status: 'failed',
+          error: chunk.errorText || 'Subagent failed',
+        });
+      }
       return;
     }
     if (adapter !== 'claude-code') return;

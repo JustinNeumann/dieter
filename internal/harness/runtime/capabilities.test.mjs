@@ -18,6 +18,34 @@ test('normalizes Claude Agent tool lifecycle', () => {
   assert.deepEqual(events[1].subagent.recentOutput, ['Found it']);
 });
 
+test('normalizes Antigravity invoke_subagent lifecycle and board_task_plan', () => {
+  const events = [];
+  const collector = createSubagentCapabilityCollector({ provider: 'antigravity', adapter: 'antigravity', messageId: 'm-agy', emit: event => events.push(event), now: () => '2026-10-31T10:00:00Z' });
+  collector.consumeUIChunk({ type: 'tool-input-available', toolCallId: 'agy-sub-1', toolName: 'invoke_subagent', input: { Role: 'Codebase Researcher', TypeName: 'research', Prompt: 'Survey harness adapters', Model: 'flash' } });
+  collector.consumeUIChunk({ type: 'tool-output-available', toolCallId: 'agy-sub-1', output: { output: 'Survey complete', durationSeconds: 2.1 } });
+  collector.consumeUIChunk({ type: 'tool-input-available', toolCallId: 'agy-plan-1', toolName: 'board_task_plan', input: { tasks: [{ content: 'Compare adapters', status: 'in_progress' }] } });
+  assert.equal(events.length, 3);
+  assert.deepEqual(events[0].subagent, {
+    id: 'agy-sub-1',
+    provider: 'antigravity',
+    messageId: 'm-agy',
+    status: 'running',
+    startedAt: '2026-10-31T10:00:00Z',
+    parentToolCallId: 'agy-sub-1',
+    name: 'Codebase Researcher',
+    agentType: 'research',
+    description: 'Codebase Researcher',
+    task: 'Survey harness adapters',
+    model: 'flash',
+    updatedAt: '2026-10-31T10:00:00Z',
+  });
+  assert.equal(events[1].subagent.status, 'completed');
+  assert.deepEqual(events[1].subagent.recentOutput, ['Survey complete']);
+  assert.equal(events[2].id, 'task-plan');
+  assert.equal(events[2].plan.source, 'board_task_plan');
+  assert.equal(events[2].plan.phases[0].tasks[0].content, 'Compare adapters');
+});
+
 test('normalizes rich OMP progress without exposing its session file', () => {
   const events = [];
   const collector = createSubagentCapabilityCollector({ provider: 'omp', messageId: 'm2', emit: event => events.push(event), now: () => '2026-08-15T10:00:00Z' });

@@ -229,7 +229,8 @@ object Tools {
             when (kind) {
                 "read",
                 "read_file",
-                "readfile" -> ToolAction.READING to listOf("path", "file_path", "filePath")
+                "readfile",
+                "view_file" -> ToolAction.READING to listOf("path", "file_path", "filePath", "Path")
                 "edit",
                 "write",
                 "write_file",
@@ -237,23 +238,33 @@ object Tools {
                 "multiedit",
                 "multi_edit",
                 "apply_patch",
-                "patch" -> ToolAction.EDITING to listOf("path", "file_path", "filePath")
+                "patch" -> ToolAction.EDITING to listOf("path", "file_path", "filePath", "Path")
                 "bash",
                 "shell",
                 "command",
+                "run_command",
                 "exec",
                 "exec_command",
-                "terminal" -> ToolAction.RUNNING to listOf("command", "cmd", "argv")
+                "terminal" ->
+                    ToolAction.RUNNING to
+                        listOf("command", "cmd", "CommandLine", "argv", "toolSummary")
                 "grep",
+                "grep_search",
                 "glob",
+                "find_by_name",
                 "search",
+                "search_web",
                 "websearch",
-                "web_search" -> ToolAction.SEARCHING to listOf("query", "pattern")
+                "web_search" ->
+                    ToolAction.SEARCHING to
+                        listOf("query", "Query", "pattern", "Pattern", "SearchPath", "SearchDirectory")
                 "webfetch",
                 "web_fetch",
-                "fetch" -> ToolAction.FETCHING to listOf("url")
+                "fetch",
+                "read_url_content" -> ToolAction.FETCHING to listOf("url", "Url")
                 "write_stdin",
-                "wait" -> return ToolActivity(ToolAction.WAITING_FOR_COMMAND, null, title)
+                "wait",
+                "manage_task" -> return ToolActivity(ToolAction.WAITING_FOR_COMMAND, null, title)
                 else -> return ToolActivity(ToolAction.USING, null, title)
             }
         var target = keys.firstNotNullOfOrNull {

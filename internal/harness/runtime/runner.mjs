@@ -519,7 +519,7 @@ try {
     execute: async (input) => capabilityCollector.consumeBoardTaskPlan(input),
   });
   const taskPlanInstructions =
-    adapter === "pi"
+    adapter === "pi" || adapter === "antigravity"
       ? "For any task with two or more meaningful steps, use board_task_plan before starting and after every status change. Keep exactly one task in_progress at a time and mark all finished tasks completed before answering."
       : "";
   const contentTools = request.contentPresentationEnabled
@@ -545,7 +545,9 @@ try {
       tools: {
         ...contentTools,
         ...processTools,
-        ...(adapter === "pi" ? { board_task_plan: piTaskPlanTool } : {}),
+        ...(adapter === "pi" || adapter === "antigravity"
+          ? { board_task_plan: piTaskPlanTool }
+          : {}),
       },
       permissionMode: "allow-all",
       sandboxConfig: { workDir: sandboxWorkDir },
