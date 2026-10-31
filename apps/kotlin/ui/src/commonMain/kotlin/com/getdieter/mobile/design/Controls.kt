@@ -33,12 +33,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -433,48 +433,57 @@ internal fun FilterPill(
     dot: Color? = null,
     glyph: Glyph? = null,
     trailingChevron: Boolean = false,
-    /** For rows that must stay narrow: no check mark (the fill shows the choice), a 13 sp label with 10 dp around it. */
+    /**
+     * For rows that must stay narrow: no check mark (the fill shows the choice), a 13 sp label with
+     * 10 dp around it.
+     */
     dense: Boolean = false,
 ) {
     if (!apple) {
-        FilterChip(
-            selected,
-            onClick,
-            label = {
-                Text(
-                    text,
-                    if (dense)
-                        Modifier.layout { measurable, constraints ->
-                            val label = measurable.measure(constraints)
-                            val cut = 6.dp.roundToPx()
-                            layout(label.width - 2 * cut, label.height) { label.place(-cut, 0) }
-                        }
-                    else Modifier,
-                    style = if (dense) LocalTextStyle.current.copy(fontSize = 13.sp) else LocalTextStyle.current,
-                    maxLines = 1,
-                )
-            },
-            // a chip narrower than its touch target would sit inside it, off the row's edge
-            modifier = if (dense) modifier.widthIn(min = 48.dp) else modifier,
-            leadingIcon =
-                when {
-                    dot != null -> {
-                        { Box(Modifier.size(8.dp).background(dot, CircleShape)) }
-                    }
-                    glyph != null -> {
-                        { Icon(glyph, null, size = 18.dp) }
-                    }
-                    selected && !dense -> {
-                        { Icon(Glyph.CHECK, null, size = 18.dp) }
-                    }
-                    else -> null
+        CompositionLocalProvider(
+            LocalMinimumInteractiveComponentSize provides
+                if (dense) Dp.Unspecified else LocalMinimumInteractiveComponentSize.current
+        ) {
+            FilterChip(
+                selected,
+                onClick,
+                label = {
+                    Text(
+                        text,
+                        if (dense)
+                            Modifier.layout { measurable, constraints ->
+                                val label = measurable.measure(constraints)
+                                val cut = 6.dp.roundToPx()
+                                layout(label.width - 2 * cut, label.height) { label.place(-cut, 0) }
+                            }
+                        else Modifier,
+                        style =
+                            if (dense) LocalTextStyle.current.copy(fontSize = 13.sp)
+                            else LocalTextStyle.current,
+                        maxLines = 1,
+                    )
                 },
-            trailingIcon =
-                if (trailingChevron) {
-                    { Icon(Glyph.CHEVRON_DOWN, null, size = 18.dp) }
-                } else null,
-            shape = RoundedCornerShape(10.dp),
-        )
+                modifier = modifier,
+                leadingIcon =
+                    when {
+                        dot != null -> {
+                            { Box(Modifier.size(8.dp).background(dot, CircleShape)) }
+                        }
+                        glyph != null -> {
+                            { Icon(glyph, null, size = 18.dp) }
+                        }
+                        selected && !dense -> {
+                            { Icon(Glyph.CHECK, null, size = 18.dp) }
+                        }
+                        else -> null
+                    },
+                trailingIcon =
+                    if (trailingChevron) {
+                        { Icon(Glyph.CHEVRON_DOWN, null, size = 18.dp) }
+                    } else null,
+                shape = RoundedCornerShape(10.dp),
+            )
+        }
         return
     }
     Row(
