@@ -121,9 +121,7 @@ internal fun CoreRuntime.creationInput(intent: CreationIntent, chat: Boolean): C
         attachments = intent.attachments,
         selection = selection,
         labelIds = if (chat) emptyList() else intent.label_ids,
-        workspaceMode =
-            intent.workspace_mode.ifEmpty { null }?.let(WorkspaceMode::parse)
-                ?: creation.workspaceMode,
+        workspaceMode = workspaceMode(intent, chat, creation.workspaceMode),
         workspaceBranch = intent.workspace_branch,
         workspaceBaseBranch = intent.workspace_base_branch,
         workspaceBaseRemote = intent.workspace_base_remote,
@@ -157,6 +155,18 @@ internal suspend fun CoreRuntime.createFromIntent(
 }
 
 /** [input] as the intent a form sends back; attachments are left out, so the form keeps its own. */
+/**
+ * The form's workspace: its own choice, else a new task starts in a new worktree and a chat where
+ * the last one was made ([remembered]).
+ */
+internal fun workspaceMode(
+    intent: CreationIntent,
+    chat: Boolean,
+    remembered: WorkspaceMode,
+): WorkspaceMode =
+    intent.workspace_mode.ifEmpty { null }?.let(WorkspaceMode::parse)
+        ?: if (chat) remembered else WorkspaceMode.WORKTREE
+
 internal fun creationIntent(input: CreationInput): CreationIntent =
     CreationIntent(
         project_id = input.project.id,

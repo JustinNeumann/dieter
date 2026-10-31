@@ -151,6 +151,23 @@ class CreationCommandsTest {
     }
 
     @Test
+    fun aNewTaskStartsInANewWorktreeWhateverTheLastOneUsed() {
+        val untouched = com.getdieter.client.v1.CreationIntent()
+        assertEquals(WorkspaceMode.WORKTREE, workspaceMode(untouched, false, WorkspaceMode.PROJECT))
+        assertEquals(
+            WorkspaceMode.PROJECT,
+            workspaceMode(untouched, true, WorkspaceMode.PROJECT),
+            "a chat keeps the last choice",
+        )
+        val chosen = com.getdieter.client.v1.CreationIntent(workspace_mode = "project")
+        assertEquals(
+            WorkspaceMode.PROJECT,
+            workspaceMode(chosen, false, WorkspaceMode.WORKTREE),
+            "the form's own choice stays",
+        )
+    }
+
+    @Test
     fun restoringAnExplicitDefaultEffortDoesNotReplaceItWithTheModelsEffort() {
         val saved = HarnessSelection("codex", "sol", "default")
         assertEquals(
