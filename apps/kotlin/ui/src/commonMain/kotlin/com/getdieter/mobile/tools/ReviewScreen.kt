@@ -223,7 +223,9 @@ internal fun ReviewScreen(store: MobileStore) {
                     }
                 }
             }
-            val checks = view.merge_readiness?.items.orEmpty()
+            val checks =
+                if (view.workspace?.mode == "worktree") view.merge_readiness?.items.orEmpty()
+                else emptyList()
             if (checks.isNotEmpty()) {
                 item { SectionHeader("Merge readiness") }
                 itemsIndexed(checks) { index, check ->

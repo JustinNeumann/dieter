@@ -3,10 +3,15 @@ package com.getdieter.core.workspace
 import com.getdieter.api.v1.Card
 import com.getdieter.api.v1.ChangedFile
 import com.getdieter.api.v1.Changeset
+import com.getdieter.api.v1.Checkout
+import com.getdieter.api.v1.GetChangesetRequest
+import com.getdieter.api.v1.GetDiffRequest
 import com.getdieter.api.v1.GitOperation
 import com.getdieter.api.v1.GitOperationLogEntry
+import com.getdieter.api.v1.Project
 import com.getdieter.api.v1.PullRequestSummary
 import com.getdieter.api.v1.SCMCapabilities
+import com.getdieter.api.v1.StartGitOperationRequest
 import com.getdieter.api.v1.ValidationCommand
 import com.getdieter.api.v1.Workspace
 import com.getdieter.api.v1.WorkspaceSummary
@@ -306,6 +311,79 @@ class WorkspaceRulesTest {
                 GitOperation(id = "obs", card_id = "c", status = "succeeded"),
                 "c",
             )
+        )
+        assertEquals(
+            "proj-op",
+            GitOperations.reconciliationId(
+                "",
+                GitOperation(id = "proj-op", project_id = "p_1", status = "running"),
+                "c",
+                "p_1",
+            ),
+        )
+        val project =
+            Project(
+                id = "p_1",
+                checkouts = listOf(Checkout(id = "co_2", path = "/work/repo")),
+            )
+        val projectWorkspace = Workspace(project_id = "p_1", mode = "project", path = "/work/repo")
+        assertEquals(
+            "p_1" to "co_2",
+            GitOperations.projectTarget(projectWorkspace, project = project),
+        )
+        assertNull(GitOperations.projectTarget(Workspace(project_id = "p_1", mode = "worktree")))
+        assertEquals(
+            GetChangesetRequest(project_id = "p_1", checkout_id = "co_2"),
+            GitOperations.changesetRequest("c_1", projectWorkspace, project = project),
+        )
+        assertEquals(
+            GetChangesetRequest(card_id = "c_1"),
+            GitOperations.changesetRequest("c_1", Workspace(project_id = "p_1", mode = "worktree")),
+        )
+        assertEquals(
+            GetDiffRequest(
+                project_id = "p_1",
+                checkout_id = "co_2",
+                path = "a.kt",
+                expected_revision = "rev-1",
+            ),
+            GitOperations.diffRequest(
+                "c_1",
+                Changeset(project_id = "p_1", revision = "rev-1"),
+                "a.kt",
+                workspace = projectWorkspace,
+                project = project,
+            ),
+        )
+        assertEquals(
+            StartGitOperationRequest(
+                project_id = "p_1",
+                checkout_id = "co_2",
+                kind = "commit",
+                expected_revision = "rev-1",
+            ),
+            GitOperations.startRequest(
+                "c_1",
+                "commit",
+                "rev-1",
+                workspace = projectWorkspace,
+                project = project,
+            ),
+        )
+        assertEquals(
+            StartGitOperationRequest(
+                card_id = "c_1",
+                kind = "create_pr",
+                expected_revision = "rev-1",
+            ),
+            GitOperations.startRequest(
+                "c_1",
+                "create_pr",
+                "rev-1",
+                workspace = projectWorkspace,
+                project = project,
+            ),
+            "PR operations stay card-scoped even on a project-directory conversation",
         )
         val existing =
             listOf(

@@ -249,12 +249,35 @@ class WorkspaceReview(
         reading.await()
     }
 
+    private fun projectTarget(workspace: Workspace? = view.value.workspace): Pair<String, String>? {
+        val card = card()
+        val projectId =
+            workspace?.project_id?.ifEmpty { null } ?: card?.project_id?.ifEmpty { null }
+        val project = projectId?.let { store.state.value.project(it) }
+        return GitOperations.projectTarget(workspace, card, project)
+    }
+
+    private fun diffRequest(
+        cardId: String,
+        workspace: Workspace?,
+        changeset: Changeset,
+        path: String,
+        commit: String = "",
+    ): GetDiffRequest {
+        val card = card()
+        val projectId =
+            workspace?.project_id?.ifEmpty { null } ?: card?.project_id?.ifEmpty { null }
+        val project = projectId?.let { store.state.value.project(it) }
+        return GitOperations.diffRequest(cardId, changeset, path, commit, workspace, card, project)
+    }
+
     private suspend fun read() {
         val (cardId, daemonId) = target()
         val bound = binding
         mutableView.update { it.copy(loading = it.workspace == null) }
         try {
-            val (workspace, rawChangeset) =
+            val initialProject = projectTarget()
+            val (workspace, firstChangeset) =
                 coroutineScope {
                     val workspace = async {
                         sessions.call(daemonId, Deadlines.PROVISION) {
@@ -262,11 +285,44 @@ class WorkspaceReview(
                         }
                     }
                     val changeset = async {
-                        sessions.call(daemonId, Deadlines.READ) {
-                            it.GetChangeset().execute(GetChangesetRequest(card_id = cardId))
+                        try {
+                            val request =
+                                if (initialProject != null) {
+                                    GetChangesetRequest(
+                                        project_id = initialProject.first,
+                                        checkout_id = initialProject.second,
+                                    )
+                                } else {
+                                    GetChangesetRequest(card_id = cardId)
+                                }
+                            sessions.call(daemonId, Deadlines.READ) {
+                                it.GetChangeset().execute(request)
+                            }
+                        } catch (error: GrpcException) {
+                            if (error.grpcStatus != GrpcStatus.FAILED_PRECONDITION) throw error
+                            val (projectId, checkoutId) =
+                                projectTarget(workspace.await()) ?: throw error
+                            sessions.call(daemonId, Deadlines.READ) {
+                                it.GetChangeset()
+                                    .execute(
+                                        GetChangesetRequest(
+                                            project_id = projectId,
+                                            checkout_id = checkoutId,
+                                        )
+                                    )
+                            }
                         }
                     }
                     workspace.await() to changeset.await()
+                }
+            val resolvedProject = projectTarget(workspace)
+            val rawChangeset =
+                if (initialProject != null && resolvedProject == null) {
+                    sessions.call(daemonId, Deadlines.READ) {
+                        it.GetChangeset().execute(GetChangesetRequest(card_id = cardId))
+                    }
+                } else {
+                    firstChangeset
                 }
             if (!owns(bound)) return
             val previous = view.value
@@ -278,11 +334,7 @@ class WorkspaceReview(
                         ?: DiffPages.read(
                                 sessions,
                                 daemonId,
-                                GetDiffRequest(
-                                    card_id = cardId,
-                                    path = file.path,
-                                    expected_revision = rawChangeset.revision,
-                                ),
+                                diffRequest(cardId, workspace, rawChangeset, file.path),
                             )
                             .also { remember(file.path, it) }
                 }
@@ -331,9 +383,10 @@ class WorkspaceReview(
             }
             resolveSelection(revisionChanged)
             GitOperations.reconciliationId(
-                    workspace.current_operation_id,
+                    workspace.current_operation_id.ifEmpty { changeset.current_operation_id },
                     view.value.operation,
                     cardId,
+                    resolvedProject?.first.orEmpty(),
                 )
                 ?.let { resume(it) }
         } catch (error: Throwable) {
@@ -427,12 +480,7 @@ class WorkspaceReview(
                 DiffPages.read(
                     sessions,
                     daemonId,
-                    GetDiffRequest(
-                        card_id = cardId,
-                        path = path,
-                        commit_sha = commit,
-                        expected_revision = changeset.revision,
-                    ),
+                    diffRequest(cardId, state.workspace, changeset, path, commit),
                     loaded,
                 )
             val current = view.value
@@ -514,17 +562,23 @@ class WorkspaceReview(
         val bound = binding
         mutableView.update { it.copy(submitting = true, error = null) }
         try {
+            val card = card()
+            val projectId =
+                view.value.workspace?.project_id?.ifEmpty { null }
+                    ?: card?.project_id?.ifEmpty { null }
+            val request =
+                GitOperations.startRequest(
+                    cardId = cardId,
+                    kind = kind,
+                    expectedRevision = view.value.changeset?.revision.orEmpty(),
+                    parameters = parameters,
+                    workspace = view.value.workspace,
+                    card = card,
+                    project = projectId?.let { store.state.value.project(it) },
+                )
             val operation =
                 sessions.call(daemonId, Deadlines.READ) {
-                    it.StartGitOperation()
-                        .execute(
-                            StartGitOperationRequest(
-                                card_id = cardId,
-                                kind = kind,
-                                expected_revision = view.value.changeset?.revision.orEmpty(),
-                                parameters = parameters,
-                            )
-                        )
+                    it.StartGitOperation().execute(request)
                 }
             if (!owns(bound)) return operation
             cursor = 0
@@ -564,7 +618,17 @@ class WorkspaceReview(
                 }
                     .onFailure { if (it is CancellationException) throw it }
                     .getOrNull()
-        if (!owns(bound) || observed == null || observed.card_id != cardId) return
+        if (!owns(bound) || observed == null) return
+        val projectId =
+            view.value.workspace?.project_id?.ifEmpty { null }
+                ?: view.value.changeset?.project_id?.ifEmpty { null }
+                ?: card()?.project_id.orEmpty()
+        val matchesTarget =
+            observed.card_id == cardId ||
+                (projectId.isNotEmpty() &&
+                    observed.card_id.isEmpty() &&
+                    observed.project_id == projectId)
+        if (!matchesTarget) return
         if (view.value.operation?.id != id) {
             cursor = 0
             mutableView.update { it.copy(operation = observed, logs = emptyList()) }
