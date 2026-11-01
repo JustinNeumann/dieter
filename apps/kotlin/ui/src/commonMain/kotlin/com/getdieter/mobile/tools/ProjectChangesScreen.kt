@@ -42,6 +42,10 @@ internal fun ProjectChangesScreen(store: MobileStore, route: MobileRoute.Tool) {
                 listOfNotNull(
                         scope.ifEmpty { null },
                         view.changes?.branch?.takeIf { it.isNotEmpty() },
+                        view.changes?.let {
+                            if (it.additions + it.deletions > 0) "+${it.additions} −${it.deletions}"
+                            else null
+                        },
                     )
                     .joinToString(" · "),
             actions =

@@ -275,7 +275,7 @@ class ProjectChanges(
         val bound = binding
         mutableView.update { it.copy(refreshing = true) }
         try {
-            val changes =
+            val rawChanges =
                 sessions.call(daemonId, Deadlines.READ) {
                     it.GetChangeset()
                         .execute(
@@ -284,7 +284,28 @@ class ProjectChanges(
                 }
             if (bound != binding) return
             val previous = view.value.changes
-            if (previous?.revision != changes.revision) diffCache.clear()
+            if (previous?.revision != rawChanges.revision) diffCache.clear()
+            val changes =
+                DiffPages.withLineCounts(rawChanges, previous) { file ->
+                    val section =
+                        if (file.unstaged || !file.staged) ChangeSection.UNSTAGED
+                        else ChangeSection.STAGED
+                    val key = file.path to section
+                    diffCache[key]?.takeIf { it.revision == rawChanges.revision }
+                        ?: DiffPages.read(
+                                sessions,
+                                daemonId,
+                                GetDiffRequest(
+                                    project_id = projectId,
+                                    checkout_id = checkoutId,
+                                    path = file.path,
+                                    section = section.wire,
+                                    expected_revision = rawChanges.revision,
+                                ),
+                            )
+                            .also { remember(key, it) }
+                }
+            if (bound != binding) return
             mutableView.update {
                 it.copy(
                     changes = changes,
@@ -308,9 +329,9 @@ class ProjectChanges(
                     it.copy(selection = selection, diff = null, diffError = null)
                         .withDiffLines(emptyList())
                 }
-                loadDiff(selection, reload = true)
+                loadDiff(selection, reload = false)
             } else if (previous?.revision != changes.revision) {
-                loadDiff(selection, reload = true)
+                loadDiff(selection, reload = false)
             }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
@@ -495,7 +516,7 @@ class ProjectChanges(
     companion object {
         private val REFRESH = 2.seconds
         private val OPERATION_POLL = 250.milliseconds
-        private const val CACHE_ENTRIES = 8
+        private const val CACHE_ENTRIES = 32
         private const val CACHE_BYTES = 8L * 1024 * 1024
 
         fun notice(kind: String): String =

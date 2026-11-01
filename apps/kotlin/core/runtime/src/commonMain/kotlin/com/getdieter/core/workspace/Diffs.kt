@@ -77,6 +77,24 @@ object UnifiedDiff {
         return lines
     }
 
+    /** Added and removed line counts across [patch]. */
+    fun counts(patch: String): Pair<Int, Int> {
+        var inHunk = false
+        var additions = 0
+        var deletions = 0
+        for (raw in patch.split('\n')) {
+            when {
+                raw.isEmpty() -> continue
+                raw.startsWith("@@") && hunkStarts(raw) != null -> inHunk = true
+                raw.startsWith("diff ") -> inHunk = false
+                !inHunk && metadata.any { raw.startsWith(it) } -> continue
+                raw.startsWith("+") -> additions++
+                raw.startsWith("-") -> deletions++
+            }
+        }
+        return additions to deletions
+    }
+
     /** `@@ -10,3 +20,4 @@` → (10, 20); null when the ranges do not parse. */
     fun hunkStarts(line: String): Pair<Int, Int>? {
         val pieces = line.split(' ')

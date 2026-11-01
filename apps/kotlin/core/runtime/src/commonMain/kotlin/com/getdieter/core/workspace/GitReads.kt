@@ -1,5 +1,7 @@
 package com.getdieter.core.workspace
 
+import com.getdieter.api.v1.ChangedFile
+import com.getdieter.api.v1.Changeset
 import com.getdieter.api.v1.FileDiff
 import com.getdieter.api.v1.GetDiffRequest
 import com.getdieter.api.v1.GitOperation
@@ -10,7 +12,12 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.TimeSource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 
 /**
  * Paged diffs, shared by the review and project changes surfaces. A diff loads [PAGE] bytes at a
@@ -21,9 +28,80 @@ object DiffPages {
     const val PAGE = 1 shl 20
     const val LIMIT = 4L * PAGE
     const val TOO_LARGE = "This diff is too large to show in full; its first 4 MB are shown."
+    const val COUNTED_FILES = 150
+    private const val COUNT_CONCURRENCY = 4
 
     /** Whether another page of [diff] may load. */
     fun hasMore(diff: FileDiff?): Boolean = diff?.truncated == true && diff.next_offset < LIMIT
+
+    /**
+     * Populates per-file and total line counts on [changes] when the daemon's porcelain status
+     * snapshot omitted them. Reuses counts from [previous] while [Changeset.revision] is unchanged,
+     * and reads at most [COUNTED_FILES] files ([COUNT_CONCURRENCY] at a time) through [diff].
+     */
+    suspend fun withLineCounts(
+        changes: Changeset,
+        previous: Changeset? = null,
+        diff: suspend (ChangedFile) -> FileDiff?,
+    ): Changeset {
+        if (changes.files.isEmpty()) return changes
+        val priorByPath =
+            if (
+                previous != null &&
+                    previous.revision.isNotEmpty() &&
+                    previous.revision == changes.revision
+            )
+                previous.files.associateBy { Triple(it.path, it.staged, it.unstaged) }
+            else emptyMap()
+        val gate = Semaphore(COUNT_CONCURRENCY)
+        val files = coroutineScope {
+            changes.files
+                .mapIndexed { index, file ->
+                    async {
+                        val prior = priorByPath[Triple(file.path, file.staged, file.unstaged)]
+                        when {
+                            file.additions != 0 || file.deletions != 0 || file.binary -> file
+                            prior != null &&
+                                (prior.additions != 0 || prior.deletions != 0 || prior.binary) ->
+                                file.copy(
+                                    additions = prior.additions,
+                                    deletions = prior.deletions,
+                                    binary = prior.binary,
+                                )
+                            index >= COUNTED_FILES || file.path.isEmpty() -> file
+                            else -> {
+                                val page =
+                                    gate.withPermit {
+                                        try {
+                                            diff(file)
+                                        } catch (cancelled: CancellationException) {
+                                            throw cancelled
+                                        } catch (_: Throwable) {
+                                            null
+                                        }
+                                    } ?: return@async file
+                                val (added, removed) = UnifiedDiff.counts(page.patch)
+                                file.copy(
+                                    additions = added,
+                                    deletions = removed,
+                                    binary = file.binary || page.binary,
+                                )
+                            }
+                        }
+                    }
+                }
+                .awaitAll()
+        }
+        val added = files.sumOf { it.additions }
+        val removed = files.sumOf { it.deletions }
+        return changes.copy(
+            files = files,
+            additions =
+                if (changes.additions != 0 || changes.deletions != 0) changes.additions else added,
+            deletions =
+                if (changes.additions != 0 || changes.deletions != 0) changes.deletions else removed,
+        )
+    }
 
     /**
      * Reads the first page of [request] from [daemonId], or the page after [loaded]; the result

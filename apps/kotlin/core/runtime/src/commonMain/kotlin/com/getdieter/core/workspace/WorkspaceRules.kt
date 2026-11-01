@@ -3,11 +3,15 @@ package com.getdieter.core.workspace
 import com.getdieter.api.v1.Card
 import com.getdieter.api.v1.ChangeComment
 import com.getdieter.api.v1.Changeset
+import com.getdieter.api.v1.GetChangesetRequest
+import com.getdieter.api.v1.GetDiffRequest
 import com.getdieter.api.v1.GitConflict
 import com.getdieter.api.v1.GitOperation
 import com.getdieter.api.v1.GitOperationLogEntry
+import com.getdieter.api.v1.Project
 import com.getdieter.api.v1.PullRequestSummary
 import com.getdieter.api.v1.SCMCapabilities
+import com.getdieter.api.v1.StartGitOperationRequest
 import com.getdieter.api.v1.ValidationCommand
 import com.getdieter.api.v1.Workspace
 import com.getdieter.core.board.Cards
@@ -206,6 +210,105 @@ object GitOperations {
     fun isTerminal(operation: GitOperation?): Boolean = operation?.status in TERMINAL
 
     /**
+     * (projectId, checkoutId) when [workspace] or [card] uses the shared project directory rather
+     * than a worktree; null for a worktree or before the mode is known.
+     */
+    fun projectTarget(
+        workspace: Workspace? = null,
+        card: Card? = null,
+        project: Project? = null,
+    ): Pair<String, String>? {
+        val mode =
+            workspace?.mode?.ifEmpty { null }
+                ?: card?.workspace?.mode?.ifEmpty { null }
+                ?: card?.workspace_mode?.ifEmpty { null }
+                ?: return null
+        if (WorkspaceMode.parse(mode) != WorkspaceMode.PROJECT) return null
+        val projectId =
+            workspace?.project_id?.ifEmpty { null }
+                ?: card?.project_id?.ifEmpty { null }
+                ?: return null
+        val checkoutId =
+            card?.checkout_id?.ifEmpty { null }
+                ?: workspace
+                    ?.path
+                    ?.ifEmpty { null }
+                    ?.let { path -> project?.checkouts?.firstOrNull { it.path == path }?.id }
+                    .orEmpty()
+        return projectId to checkoutId
+    }
+
+    fun changesetRequest(
+        cardId: String,
+        workspace: Workspace? = null,
+        card: Card? = null,
+        project: Project? = null,
+    ): GetChangesetRequest =
+        projectTarget(workspace, card, project)?.let { (projectId, checkoutId) ->
+            GetChangesetRequest(project_id = projectId, checkout_id = checkoutId)
+        } ?: GetChangesetRequest(card_id = cardId)
+
+    fun diffRequest(
+        cardId: String,
+        changeset: Changeset,
+        path: String,
+        commit: String = "",
+        workspace: Workspace? = null,
+        card: Card? = null,
+        project: Project? = null,
+    ): GetDiffRequest {
+        val target =
+            projectTarget(workspace, card, project)
+                ?: changeset.project_id
+                    .takeIf { it.isNotEmpty() && changeset.card_id.isEmpty() }
+                    ?.let { it to card?.checkout_id.orEmpty() }
+        return if (target != null) {
+            GetDiffRequest(
+                project_id = target.first,
+                checkout_id = target.second,
+                path = path,
+                commit_sha = commit,
+                expected_revision = changeset.revision,
+            )
+        } else {
+            GetDiffRequest(
+                card_id = cardId,
+                path = path,
+                commit_sha = commit,
+                expected_revision = changeset.revision,
+            )
+        }
+    }
+
+    fun startRequest(
+        cardId: String,
+        kind: String,
+        expectedRevision: String,
+        parameters: Map<String, String> = emptyMap(),
+        workspace: Workspace? = null,
+        card: Card? = null,
+        project: Project? = null,
+    ): StartGitOperationRequest {
+        val target = projectTarget(workspace, card, project)?.takeIf { kind in PROJECT_KINDS }
+        return if (target != null) {
+            StartGitOperationRequest(
+                project_id = target.first,
+                checkout_id = target.second,
+                kind = kind,
+                expected_revision = expectedRevision,
+                parameters = parameters,
+            )
+        } else {
+            StartGitOperationRequest(
+                card_id = cardId,
+                kind = kind,
+                expected_revision = expectedRevision,
+                parameters = parameters,
+            )
+        }
+    }
+
+    /**
      * The operation to follow: the workspace's current one, else the observed one while it is still
      * active.
      */
@@ -213,9 +316,17 @@ object GitOperations {
         workspaceOperationId: String,
         observed: GitOperation?,
         cardId: String,
+        projectId: String = "",
     ): String? =
         workspaceOperationId.ifEmpty { null }
-            ?: observed?.takeIf { it.card_id == cardId && it.status in ACTIVE }?.id
+            ?: observed
+                ?.takeIf {
+                    (it.card_id == cardId ||
+                        (projectId.isNotEmpty() &&
+                            it.card_id.isEmpty() &&
+                            it.project_id == projectId)) && it.status in ACTIVE
+                }
+                ?.id
 
     /** Merges streamed logs by sequence (the first copy wins), in order. */
     fun mergeLogs(
