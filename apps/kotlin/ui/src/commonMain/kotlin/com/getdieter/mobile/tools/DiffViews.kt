@@ -130,7 +130,7 @@ private fun ChangedFileRow(
             }
             Spacer(Modifier.width(8.dp))
             if (file.binary) Text("Binary", style = type.caption, color = palette.secondaryLabel)
-            else {
+            else if (file.additions > 0 || file.deletions > 0) {
                 Text(
                     "+${file.additions}",
                     style = type.caption.copy(fontWeight = FontWeight.SemiBold),

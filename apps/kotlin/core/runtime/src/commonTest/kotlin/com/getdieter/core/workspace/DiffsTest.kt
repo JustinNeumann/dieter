@@ -1,10 +1,14 @@
 package com.getdieter.core.workspace
 
+import com.getdieter.api.v1.ChangedFile
+import com.getdieter.api.v1.Changeset
+import com.getdieter.api.v1.FileDiff
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 /** Diff layout as both clients show it; ported from the macOS diff display tests. */
 class DiffsTest {
@@ -226,5 +230,53 @@ class DiffsTest {
                 it == 1
             },
         )
+    }
+
+    @Test
+    fun changesetLineCountsComeFromEachFilesPatchAndReuseTheSameRevision() = runTest {
+        val patches =
+            mapOf(
+                "a.kt" to
+                    FileDiff(
+                        patch =
+                            "diff --git a/a.kt b/a.kt\n--- a/a.kt\n+++ b/a.kt\n@@ -1,2 +1,3 @@\n-old\n---still old\n+new\n+++still new\n+\n"
+                    ),
+                "icon.png" to FileDiff(binary = true, patch = "Binary files differ"),
+            )
+        val raw =
+            Changeset(
+                revision = "rev-1",
+                files =
+                    listOf(
+                        ChangedFile(path = "a.kt", status = "modified", unstaged = true),
+                        ChangedFile(path = "icon.png", status = "modified", unstaged = true),
+                        ChangedFile(path = "broken.kt", status = "modified", unstaged = true),
+                    ),
+            )
+        var calls = 0
+        val counted =
+            DiffPages.withLineCounts(raw) { file ->
+                calls++
+                if (file.path == "broken.kt") error("boom")
+                patches[file.path]
+            }
+        assertEquals(3, calls)
+        assertEquals(3 to 2, counted.files[0].let { it.additions to it.deletions })
+        assertTrue(counted.files[1].binary)
+        assertEquals(0 to 0, counted.files[2].let { it.additions to it.deletions })
+        assertEquals(3 to 2, counted.additions to counted.deletions)
+
+        // Same revision: the files with known counts or binary state are reused without re-reading.
+        var secondCalls = 0
+        val reused =
+            DiffPages.withLineCounts(raw, previous = counted) { file ->
+                secondCalls++
+                FileDiff(patch = "@@ -1 +1 @@\n+${file.path}")
+            }
+        assertEquals(1, secondCalls, "only the uncounted file is retried on the same revision")
+        assertEquals(3 to 2, reused.files[0].let { it.additions to it.deletions })
+        assertTrue(reused.files[1].binary)
+        assertEquals(1 to 0, reused.files[2].let { it.additions to it.deletions })
+        assertEquals(4 to 2, reused.additions to reused.deletions)
     }
 }

@@ -159,6 +159,7 @@ class WorkspaceReview(
     private var watcher: Job? = null
     private var watchedId: String? = null
     private var cursor = 0L
+    private val diffCache = LinkedHashMap<String, FileDiff>()
 
     fun bind(cardId: String?, daemonId: String?) {
         val current = view.value
@@ -169,6 +170,7 @@ class WorkspaceReview(
         watcher?.cancel()
         watchedId = null
         cursor = 0
+        diffCache.clear()
         mutableView.value =
             WorkspaceReviewView(
                 cardId = cardId,
@@ -252,7 +254,7 @@ class WorkspaceReview(
         val bound = binding
         mutableView.update { it.copy(loading = it.workspace == null) }
         try {
-            val (workspace, changeset) =
+            val (workspace, rawChangeset) =
                 coroutineScope {
                     val workspace = async {
                         sessions.call(daemonId, Deadlines.PROVISION) {
@@ -268,7 +270,23 @@ class WorkspaceReview(
                 }
             if (!owns(bound)) return
             val previous = view.value
-            val revisionChanged = previous.changeset?.revision != changeset.revision
+            val revisionChanged = previous.changeset?.revision != rawChangeset.revision
+            if (revisionChanged) diffCache.clear()
+            val changeset =
+                DiffPages.withLineCounts(rawChangeset, previous.changeset) { file ->
+                    diffCache[file.path]?.takeIf { it.revision == rawChangeset.revision }
+                        ?: DiffPages.read(
+                                sessions,
+                                daemonId,
+                                GetDiffRequest(
+                                    card_id = cardId,
+                                    path = file.path,
+                                    expected_revision = rawChangeset.revision,
+                                ),
+                            )
+                            .also { remember(file.path, it) }
+                }
+            if (!owns(bound)) return
             val comments =
                 if (revisionChanged) {
                     runCatching {
@@ -387,6 +405,19 @@ class WorkspaceReview(
         val changeset = state.changeset ?: return
         val path = state.selectedPath.orEmpty()
         val commit = state.selectedCommit.orEmpty()
+        if (!append && commit.isEmpty()) {
+            diffCache[path]
+                ?.takeIf { it.revision == changeset.revision }
+                ?.let { cached ->
+                    diffCache.remove(path)
+                    diffCache[path] = cached
+                    mutableView.update {
+                        it.copy(diff = cached, diffLoading = false)
+                            .withDiffLines(UnifiedDiff.parse(cached.patch))
+                    }
+                    return
+                }
+        }
         val bound = binding
         val request = ++diffRequest
         mutableView.update { it.copy(diffLoading = true) }
@@ -414,6 +445,7 @@ class WorkspaceReview(
                     (append && current.diff != loaded)
             )
                 return
+            if (commit.isEmpty()) remember(path, combined)
             mutableView.update {
                 it.copy(diff = combined, diffLoading = false)
                     .withDiffLines(UnifiedDiff.parse(combined.patch))
@@ -793,9 +825,22 @@ class WorkspaceReview(
     /** Dismisses a shown error; the next refresh or operation reports a new one. */
     fun clearError() = mutableView.update { it.copy(error = null) }
 
+    private fun remember(path: String, diff: FileDiff) {
+        diffCache.remove(path)
+        diffCache[path] = diff
+        while (
+            diffCache.size > CACHE_ENTRIES ||
+                diffCache.values.sumOf { it.patch.length.toLong() } > CACHE_BYTES
+        ) {
+            diffCache.remove(diffCache.keys.first())
+        }
+    }
+
     companion object {
         const val HEARTBEAT_MS = 15_000
         private val REFRESH = 5.seconds
         private val MERGE_POLL = 400.milliseconds
+        private const val CACHE_ENTRIES = 32
+        private const val CACHE_BYTES = 8L * 1024 * 1024
     }
 }
