@@ -13,6 +13,8 @@ import com.getdieter.api.gateway.v1.RefreshProviderQuotasRequest
 import com.getdieter.api.gateway.v1.SetProviderQuotaSummaryInclusionRequest
 import com.getdieter.api.gateway.v1.WatchProviderQuotasRequest
 import com.getdieter.api.v1.Card
+import com.getdieter.core.mail.LocalDay
+import com.getdieter.core.mail.MailDates
 import com.getdieter.core.runtime.Backoff
 import com.getdieter.core.runtime.CoreLogger
 import com.getdieter.core.runtime.Deadlines
@@ -450,6 +452,20 @@ object Quotas {
             left.inWholeHours > 0 -> "Resets in ${left.inWholeHours}h ${left.inWholeMinutes % 60}m"
             else -> "Resets in ${minutes}m"
         }
+    }
+
+    /**
+     * When a window resets, in the device's zone to the nearest minute, e.g. "Sun 8 Nov 20:59"
+     * (the year too when it is not [now]'s); the unparsed [resetsAt] when it is no timestamp.
+     */
+    fun resetClock(resetsAt: String, now: Instant, offset: (Instant) -> Int): String {
+        val at = Timestamps.parse(resetsAt) ?: return resetsAt
+        val rounded = Instant.fromEpochSeconds((at.epochSeconds + 30).floorDiv(60) * 60)
+        val zone = offset(rounded)
+        val day = LocalDay.of(rounded, zone)
+        val year = if (day.year == LocalDay.of(now, offset(now)).year) "" else " ${day.year}"
+        val clock = MailDates.clock(rounded, zone)
+        return "${MailDates.weekday(day)} ${MailDates.dayMonth(day)}$year $clock"
     }
 
     /** The account a conversation last ran on, matched by its opaque key only. */

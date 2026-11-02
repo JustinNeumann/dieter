@@ -10,13 +10,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.getdieter.client.v1.*
+import com.getdieter.core.quotas.Quotas
+import com.getdieter.core.runtime.localUtcOffsetSeconds
 import com.getdieter.mobile.app.*
 import com.getdieter.mobile.design.*
 import com.getdieter.mobile.design.Tone
 import com.getdieter.mobile.store.*
+import kotlin.time.Clock
 
 @Composable
 internal fun UsageScreen(store: MobileStore) {
@@ -128,9 +132,10 @@ internal fun UsageScreen(store: MobileStore) {
                                 Row(Modifier.padding(vertical = 3.dp)) {
                                     Text(
                                         window.name,
-                                        Modifier.weight(1f),
+                                        Modifier.padding(end = 12.dp),
                                         style = type.subheadline,
                                         color = palette.label,
+                                        softWrap = false,
                                     )
                                     Text(
                                         listOfNotNull(
@@ -139,11 +144,20 @@ internal fun UsageScreen(store: MobileStore) {
                                                 else "Not reported",
                                                 window.resets_at
                                                     .takeIf { it.isNotEmpty() }
-                                                    ?.let { "resets $it" },
+                                                    ?.let {
+                                                        "resets " +
+                                                            Quotas.resetClock(
+                                                                it,
+                                                                Clock.System.now(),
+                                                                ::localUtcOffsetSeconds,
+                                                            )
+                                                    },
                                             )
                                             .joinToString(" · "),
+                                        Modifier.weight(1f),
                                         style = type.subheadline,
                                         color = palette.secondaryLabel,
+                                        textAlign = TextAlign.End,
                                     )
                                 }
                             }

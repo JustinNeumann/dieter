@@ -8,7 +8,11 @@ copy the **Unreleased** notes into a section named after that exact version
 
 ## Unreleased
 
-Nothing yet.
+### Fixed
+
+- The Usage screen shows when a limit resets as a local day and time to the
+  minute ("Sun 8 Nov 21:00") instead of the raw timestamp, and the window name
+  no longer wraps one letter per line.
 
 ## 0.6.431
 
